@@ -44,6 +44,7 @@ Factors differentiating the arches-querysets approach include:
         - [DRF Spectacular](https://drf-spectacular.readthedocs.io/) (schema generation)
         - [not yet confirmed:] Django GraphQL API clients
         - [django-filter](https://django-filter.readthedocs.io/)
+        - [django-debug-toolbar](https://django-debug-toolbar.readthedocs.io/)
         - etc.
     - familiar interface for developers exposed to Django
     - can leverage built-in features of QuerySets:
@@ -72,3 +73,7 @@ The initial goal is for the first release to support both Arches 7.6 and 8.0.
 ### Contributing
 
 Contributions and bug reports are welcome!
+
+### Thanks
+
+We are grateful to members of the Arches community that have shared prior work in this area: in particular, the approaches linked in the [precedents](#how-does-this-compare-to-other-approaches).
