@@ -4,10 +4,41 @@ A Django-native interface for expressing application logic,
 querying business data, or building APIs using semantic (graph) labels instead of tile and node IDs.
 
 ### Installation
+(The optional integration with Django REST Framework is included below.)
 
+In pyproject.toml:
+```
+dependencies = [
+    ...
+    "arches_querysets @ git+https://github.com/archesproject/arches-querysets@main",
+    "restframework",
+]
+```
+In settings.py:
+```
+INSTALLED_APPS = [
+    ...
+    "arches_querysets",
+    "rest_framework",  # if you are using the Django REST Framework integration
+    ...
+]
+
+REST_FRAMEWORK = {  # if you are using the Django REST Framework integration
+    # TODO: choose most appropriate default.
+    # Use Django's standard `django.contrib.auth` permissions,
+    # or allow read-only access for unauthenticated users.
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly"
+    ],
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.LimitOffsetPagination",
+    "PAGE_SIZE": API_MAX_PAGE_SIZE,
+}
+```
 
 ### Usage
-
+```
+forthcoming
+```
 
 ### How would this help an Arches developer?
 
