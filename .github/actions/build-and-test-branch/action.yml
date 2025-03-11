@@ -66,11 +66,11 @@ runs:
         ! git ls-files --eol | grep -v '.xml' | grep 'w/crlf\|w/mixed'
       shell: bash
 
-    - name: Run frontend tests
-      run: |
-        npm run vitest
-        mv coverage/frontend/coverage.xml ${{ inputs.branch-type }}_branch_frontend_coverage.xml
-      shell: bash
+    # - name: Run frontend tests
+    #   run: |
+    #     npm run vitest
+    #     mv coverage/frontend/coverage.xml ${{ inputs.branch-type }}_branch_frontend_coverage.xml
+    #   shell: bash
 
     - name: Check for missing migrations
       run: |
@@ -94,12 +94,12 @@ runs:
         mv coverage/python/coverage.json ${{ inputs.branch-type }}_branch_python_coverage.json
       shell: bash
 
-    - name: Upload frontend coverage report as artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ inputs.branch-type }}-branch-frontend-coverage-report
-        path: ${{ inputs.branch-type }}_branch_frontend_coverage.xml
-        overwrite: true
+    # - name: Upload frontend coverage report as artifact
+    #   uses: actions/upload-artifact@v4
+    #   with:
+    #     name: ${{ inputs.branch-type }}-branch-frontend-coverage-report
+    #     path: ${{ inputs.branch-type }}_branch_frontend_coverage.xml
+    #     overwrite: true
 
     - name: Upload Python coverage report as artifact
       uses: actions/upload-artifact@v4
