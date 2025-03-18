@@ -11,7 +11,7 @@ In pyproject.toml:
 dependencies = [
     ...
     "arches_querysets @ git+https://github.com/archesproject/arches-querysets@main",
-    "restframework",
+    "djangorestframework",
 ]
 ```
 In settings.py:
