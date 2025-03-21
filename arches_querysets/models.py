@@ -47,7 +47,7 @@ class AliasedData:
             setattr(self, key, value)
 
     def __repr__(self):
-        return f"<AliasedData: {vars(self)}"
+        return f"<AliasedData: {vars(self)}>"
 
 
 class SemanticResource(ResourceInstance):
