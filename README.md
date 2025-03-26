@@ -1,7 +1,7 @@
 ## arches-querysets
 
 A Django-native interface for expressing application logic,
-querying business data, or building APIs using semantic (graph) labels instead of tile and node IDs.
+querying business data, or building APIs using semantic labels: node and nodegroup aliases (rather than UUIDs).
 
 ### Installation
 (The optional integration with Django REST Framework is included below.)
@@ -61,7 +61,7 @@ In brief:
     - Skips all python-level validation logic
     - Requires direct database operations (migrations) to create views
     - Some known performance overhead
-    - Potential for drift against future datatype development, not designed for extensibility
+    - Unknown status of custom/future datatypes
 - [flaxandteal/arches-orm](https://flaxandteal.github.io/arches-orm/docs/quickstart/)
     - Server-side access to pythonic resource models after fetching them from the database
     - Designed to wrap other backends besides Postgres, e.g. SpatiaLite
@@ -73,7 +73,7 @@ Factors differentiating the arches-querysets approach include:
     - interoperability with other Django tools and third-party packages:
         - [Django REST Framework](https://www.django-rest-framework.org/)
         - [DRF Spectacular](https://drf-spectacular.readthedocs.io/) (schema generation)
-        - [not yet confirmed:] Django GraphQL API clients
+        - [speculative:] Django GraphQL API clients?
         - [django-filter](https://django-filter.readthedocs.io/)
         - [django-debug-toolbar](https://django-debug-toolbar.readthedocs.io/)
         - etc.
