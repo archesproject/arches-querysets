@@ -3,10 +3,13 @@ requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "arches_querysets"
+name = "arches-querysets"
 readme = "README.md"
-authors = []
-license = {text = "GNU AGPL3"}
+authors = [
+    {name = "Arches Project"}
+]
+license = "AGPL-3.0-or-later"
+description = "A Django-native interface for Arches implementers to express application logic, query business data, and build APIs."
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Programming Language :: Python",
@@ -20,9 +23,6 @@ classifiers = [
     "Framework :: Django :: 4.2",
     "Framework :: Django :: 5.2",
     "Intended Audience :: Developers",
-    "Intended Audience :: Science/Research",
-    "Intended Audience :: Information Technology",
-    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
 ]
 requires-python = ">=3.10"
 dependencies = [
@@ -30,6 +30,12 @@ dependencies = [
     "djangorestframework==3.15.2",
 ]
 version = "0.1.0"
+
+[project.urls]
+Homepage = "https://archesproject.org/"
+Documentation = "https://arches.readthedocs.io"
+Repository = "https://github.com/archesproject/arches-querysets.git"
+Issues = "https://github.com/archesproject/arches-querysets/issues"
 
 [project.optional-dependencies]
 dev = [
