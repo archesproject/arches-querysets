@@ -26,16 +26,16 @@ NOT_PROVIDED = object()
 
 
 class BulkTileOperation:
-    def __init__(self, entry, user=None, save_kwargs=None):
+    def __init__(self, *, entry, request=None, save_kwargs=None):
         self.to_insert = set()
         self.to_update = set()
         self.to_delete = set()
         self.errors_by_node_alias = defaultdict(list)
         self.entry = entry  # resource or tile
-        self.user = user
         self.datatype_factory = DataTypeFactory()
-        self.dummy_request = HttpRequest()
-        self.dummy_request.user = user
+        self.request = request
+        if not self.request:
+            self.request = HttpRequest()
         self.save_kwargs = save_kwargs or {}
         self.transaction_id = uuid.uuid4()
 
@@ -162,12 +162,10 @@ class BulkTileOperation:
         if all(isinstance(tile, TileModel) for tile in new_tiles):
             new_tiles.sort(key=attrgetter("sortorder"))
         else:
-            # DRF doesn't provide nested writable fields by default.
-            # TODO: probably move this to the serializers.
             parent_tile = container if isinstance(container, TileModel) else None
             new_tiles = [
-                SemanticTile(**{**tile, "parenttile": parent_tile})
-                for tile in new_tiles
+                SemanticTile.deserialize(tile_dict, parent_tile=parent_tile)
+                for tile_dict in new_tiles
             ]
         existing_tiles = self.existing_tiles_by_nodegroup_alias[grouping_node.alias]
         if not existing_tiles:
@@ -292,12 +290,14 @@ class BulkTileOperation:
     def _validate_and_patch_from_tile_values(self, tile, *, nodes, languages):
         """Validate data found on ._incoming_tile and move it to .data.
         Update errors_by_node_alias in place."""
-        from arches_querysets.models import SemanticTile
+        from arches_querysets.models import AliasedData, SemanticTile
 
         for node in nodes:
             node_id_str = str(node.pk)
             # TODO: move this somewhere else?
-            if isinstance(tile._incoming_tile, SemanticTile):
+            if isinstance(tile._incoming_tile, SemanticTile) and isinstance(
+                tile._incoming_tile.aliased_data, AliasedData
+            ):
                 value_to_validate = getattr(
                     tile._incoming_tile.aliased_data, node.alias, NOT_PROVIDED
                 )
@@ -420,7 +420,7 @@ class BulkTileOperation:
                 # Some functions expect to always drill into request.user
                 # https://github.com/archesproject/arches/issues/8471
                 try:
-                    upsert_proxy._Tile__preSave(request=self.dummy_request)
+                    upsert_proxy._Tile__preSave(request=self.request)
                     upsert_proxy.check_for_missing_nodes()  # also runs clean()
                     upsert_proxy.check_for_constraint_violation()
                 except TileValidationError as tve:
@@ -433,7 +433,7 @@ class BulkTileOperation:
                     upsert_proxy,
                     upsert_proxy._existing_data,
                     upsert_proxy._existing_provisionaledits,
-                    user=self.user,
+                    user=getattr(self.request, "user", None),
                 )
                 # Remember the values needed for the edit log updates later.
                 upsert_proxy._oldprovisionalvalue = oldprovisionalvalue
@@ -444,7 +444,7 @@ class BulkTileOperation:
                 upsert_proxy._existing_data = vanilla_instance.data
 
             for delete_proxy in delete_proxies:
-                delete_proxy._Tile__preDelete(request=self.dummy_request)
+                delete_proxy._Tile__preDelete(request=self.request)
 
             if self.to_insert:
                 inserted = TileModel.objects.bulk_create(self.to_insert)
@@ -486,7 +486,7 @@ class BulkTileOperation:
                 for node in grouping_node.nodegroup.node_set.all():
                     datatype = self.datatype_factory.get_instance(node.datatype)
                     datatype.post_tile_save(
-                        upsert_tile, str(node.pk), request=self.dummy_request
+                        upsert_tile, str(node.pk), request=self.request
                     )
 
             for upsert_proxy in upsert_proxies:
@@ -495,7 +495,7 @@ class BulkTileOperation:
             # Save edits: could be done in bulk once above side effects are un-proxied.
             for insert_proxy in insert_proxies:
                 insert_proxy.save_edit(
-                    user=self.user,
+                    user=getattr(self.request, "user", None),
                     edit_type="tile create",
                     old_value={},
                     new_value=insert_proxy.data,
@@ -508,7 +508,7 @@ class BulkTileOperation:
                 )
             for update_proxy in update_proxies:
                 update_proxy.save_edit(
-                    user=self.user,
+                    user=getattr(self.request, "user", None),
                     edit_type="tile edit",
                     old_value=update_proxy._existing_data,
                     new_value=update_proxy.data,
@@ -519,7 +519,7 @@ class BulkTileOperation:
                 )
             for delete_proxy in delete_proxies:
                 delete_proxy.save_edit(
-                    user=self.user,
+                    user=getattr(self.request, "user", None),
                     edit_type="tile delete",
                     old_value=delete_proxy.data,
                     provisional_edit_log_details=None,

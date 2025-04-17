@@ -1,5 +1,6 @@
 import logging
 import sys
+import uuid
 from itertools import chain
 
 from django.db import models, transaction
@@ -95,20 +96,14 @@ class SemanticResource(ResourceInstance):
             user=user, edit_type=edit_type, transaction_id=transaction_id
         )
 
-    def save(self, index=False, user=None, **kwargs):
+    def save(self, *, request=None, index=False, **kwargs):
         with transaction.atomic():
-            self._save_aliased_data(user=user, index=index, **kwargs)
-
-    def clean(self):
-        """Raises a compound ValidationError with any failing tile values."""
-        # Might be able to remove graph_nodes if we can just deal with grouping_node.
-        bulk_operation = BulkTileOperation(entry=self, resource=self)
-        bulk_operation.validate()
+            self._save_aliased_data(request=request, index=index, **kwargs)
 
     def save_without_related_objects(self, **kwargs):
         return super().save(**kwargs)
 
-    def _save_aliased_data(self, user=None, index=False, **kwargs):
+    def _save_aliased_data(self, *, request=None, index=False, **kwargs):
         """Raises a compound ValidationError with any failing tile values.
 
         It's not exactly idiomatic for a Django project to clean()
@@ -117,7 +112,9 @@ class SemanticResource(ResourceInstance):
             - the node values are phantom fields.
             - we have other entry points besides DRF.
         """
-        bulk_operation = BulkTileOperation(entry=self, user=user, save_kwargs=kwargs)
+        bulk_operation = BulkTileOperation(
+            entry=self, request=request, save_kwargs=kwargs
+        )
         bulk_operation.run()
 
         self.refresh_from_db(
@@ -131,7 +128,10 @@ class SemanticResource(ResourceInstance):
         if index:
             proxy_resource.index()
 
-        self.save_edit(user=user, transaction_id=bulk_operation.transaction_id)
+        if request:
+            self.save_edit(
+                user=request.user, transaction_id=bulk_operation.transaction_id
+            )
 
     def refresh_from_db(self, using=None, fields=None, from_queryset=None):
         if from_queryset is None:
@@ -166,6 +166,27 @@ class SemanticTile(TileModel):
         if not getattr(self, "_nodegroup_alias", None):
             self._nodegroup_alias = Node.objects.get(pk=self.nodegroup_id).alias
         return self._nodegroup_alias
+
+    @classmethod
+    def deserialize(cls, tile_dict, parent_tile: TileModel | None):
+        """
+        DRF doesn't provide nested writable fields by default,
+        so we have this little deserializer helper. Must be a better way.
+        """
+        attrs = {**tile_dict}
+        if tile_id := attrs.pop("tileid", None):
+            attrs["tileid"] = uuid.UUID(tile_id)
+        if resourceinstance_id := attrs.pop("resourceinstance", None):
+            attrs["resourceinstance_id"] = uuid.UUID(resourceinstance_id)
+        if nodegroup_id := attrs.pop("nodegroup", None):
+            attrs["nodegroup_id"] = uuid.UUID(nodegroup_id)
+        if parenttile_id := attrs.pop("parenttile", None):
+            attrs["parenttile_id"] = uuid.UUID(parenttile_id)
+
+        attrs["parenttile"] = parent_tile
+
+        tile = cls(**attrs)
+        return tile
 
     @classmethod
     def as_nodegroup(
@@ -216,11 +237,11 @@ class SemanticTile(TileModel):
         ).annotate(_nodegroup_alias=models.Value(entry_node_alias))
         # TODO: determine if this annotation still needed / remove
 
-    def save(self, index=False, user=None, **kwargs):
+    def save(self, *, request=None, index=False, **kwargs):
         with transaction.atomic():
             if self.sortorder is None or self.is_fully_provisional():
                 self.set_next_sort_order()
-            self._save_aliased_data(user=user, index=index, **kwargs)
+            self._save_aliased_data(request=request, index=index, **kwargs)
 
     def save_without_related_objects(self, **kwargs):
         return super().save(**kwargs)
@@ -231,8 +252,10 @@ class SemanticTile(TileModel):
         save_kwargs = {**kwargs, "update_fields": set()}
         return super().save(**save_kwargs)
 
-    def _save_aliased_data(self, *, user=None, index=False, **kwargs):
-        bulk_operation = BulkTileOperation(entry=self, user=user, save_kwargs=kwargs)
+    def _save_aliased_data(self, *, request=None, index=False, **kwargs):
+        bulk_operation = BulkTileOperation(
+            entry=self, request=request, save_kwargs=kwargs
+        )
         bulk_operation.run()
 
         # TODO: add unique constraint for TileModel re: sortorder
