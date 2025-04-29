@@ -23,13 +23,7 @@ INSTALLED_APPS = [
     ...
 ]
 
-REST_FRAMEWORK = {  # if you are using the Django REST Framework integration
-    # TODO: choose most appropriate default.
-    # Use Django's standard `django.contrib.auth` permissions,
-    # or allow read-only access for unauthenticated users.
-    "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly"
-    ],
+REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.LimitOffsetPagination",
     "PAGE_SIZE": API_MAX_PAGE_SIZE,
 }
