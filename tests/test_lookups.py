@@ -27,27 +27,51 @@ class LookupTests(TestCase):
         cls.top_node = Node.objects.create(
             graph=cls.graph, istopnode=True, datatype="semantic"
         )
-        cls.grouping_node = Node(
-            graph=cls.graph, alias="datatypes", istopnode=False, datatype="semantic"
-        )
-        cls.nodegroup = NodeGroup.objects.create(
-            pk=cls.grouping_node.pk, grouping_node=cls.grouping_node
-        )
-        cls.grouping_node.nodegroup = cls.nodegroup
-        cls.grouping_node.save()
 
-        data_nodes = [
+        cls.grouping_node_1 = Node(
+            graph=cls.graph, alias="datatypes-1", istopnode=False, datatype="semantic"
+        )
+        cls.nodegroup_1 = NodeGroup.objects.create(
+            pk=cls.grouping_node_1.pk, grouping_node=cls.grouping_node_1
+        )
+        cls.grouping_node_1.nodegroup = cls.nodegroup_1
+        cls.grouping_node_1.save()
+
+        cls.grouping_node_n = Node(
+            graph=cls.graph, alias="datatypes-n", istopnode=False, datatype="semantic"
+        )
+        cls.nodegroup_n = NodeGroup.objects.create(
+            pk=cls.grouping_node_n.pk,
+            grouping_node=cls.grouping_node_n,
+            cardinality="n",
+        )
+        cls.grouping_node_n.nodegroup = cls.nodegroup_n
+        cls.grouping_node_n.save()
+
+        datatypes = DDataType.objects.all()
+        data_nodes_1 = [
             Node(
                 datatype=datatype,
-                alias=datatype,
-                name=datatype,
+                alias=datatype.pk,
+                name=datatype.pk,
                 istopnode=False,
-                nodegroup=cls.nodegroup,
+                nodegroup=cls.nodegroup_1,
                 graph=cls.graph,
             )
-            for datatype in DDataType.objects.all()
+            for datatype in datatypes
         ]
-        Node.objects.bulk_create(data_nodes)
+        data_nodes_n = [
+            Node(
+                datatype=datatype,
+                alias=datatype.pk + "-n",
+                name=datatype.pk + "-n",
+                istopnode=False,
+                nodegroup=cls.nodegroup_n,
+                graph=cls.graph,
+            )
+            for datatype in datatypes
+        ]
+        Node.objects.bulk_create(data_nodes_1 + data_nodes_n)
 
         cls.datatype_factory = DataTypeFactory()
         ri_datatype = cls.datatype_factory.get_instance("resource-instance")
@@ -82,13 +106,22 @@ class LookupTests(TestCase):
             # reference (?)
         }
 
-        cls.tile = TileModel.objects.create(
-            nodegroup=cls.nodegroup,
+        cls.cardinality_1_tile = TileModel.objects.create(
+            nodegroup=cls.nodegroup_1,
             resourceinstance=cls.resource,
-            sortorder=0,
             data={
                 str(node.pk): cls.sample_data[node.datatype.pk]
-                for node in data_nodes
+                for node in data_nodes_1
+                if node.datatype.pk in cls.sample_data
+            },
+        )
+
+        cls.cardinality_n_tile = TileModel.objects.create(
+            nodegroup=cls.nodegroup_n,
+            resourceinstance=cls.resource,
+            data={
+                str(node.pk): cls.sample_data[node.datatype.pk]
+                for node in data_nodes_n
                 if node.datatype.pk in cls.sample_data
             },
         )
@@ -109,6 +142,26 @@ class LookupTests(TestCase):
             ("resource-instance-list__0__ontologyProperty", ""),
             ("concept", "00000000-0000-0000-0000-000000000001"),
             ("concept-list", ["00000000-0000-0000-0000-000000000001"]),
+        ]:
+            with self.subTest(lookup=lookup, value=value):
+                self.assertTrue(resources.filter(**{lookup: value}))
+
+    def test_cardinality_n_resource_lookups(self):
+        resources = SemanticResource.as_model("datatype_lookups")
+
+        # Exact
+        for lookup, value in [
+            # ("boolean-n__contains", True),
+            # ("number-n__contains", 42.0),  # Use a float so that stringifying causes failure.
+            # ("url__url_label", "42.com"),
+            ("non-localized-string-n__contains", "forty-two"),
+            # ("string-n__en__value", "forty-two"),
+            # ("date-n__contains", "2042-04-02"),
+            # More natural lookups in test_resource_instance_lookups()
+            # ("resource-instance-n__0__ontologyProperty", ""),
+            # ("resource-instance-list-n__0__ontologyProperty", ""),
+            ("concept-n__contains", "00000000-0000-0000-0000-000000000001"),
+            # ("concept-list-n__contains", ["00000000-0000-0000-0000-000000000001"]),
         ]:
             with self.subTest(lookup=lookup, value=value):
                 self.assertTrue(resources.filter(**{lookup: value}))
