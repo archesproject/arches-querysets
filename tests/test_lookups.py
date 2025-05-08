@@ -8,7 +8,6 @@ from arches.app.models.models import (
     NodeGroup,
     ResourceInstance,
     TileModel,
-    Value,
 )
 
 from arches_querysets.models import SemanticResource
@@ -105,8 +104,7 @@ class LookupTests(TestCase):
             ("non-localized-string", "forty-two"),
             ("string__en__value", "forty-two"),
             ("date", "2042-04-02"),
-            # ("resource-instance__id", str(self.resource.pk)),
-            # ("resource-instance__ids", [str(self.resource.pk)]),
+            # More natural lookups in test_resource_instance_lookups()
             ("resource-instance__0__ontologyProperty", ""),
             ("resource-instance-list__0__ontologyProperty", ""),
             ("concept", "00000000-0000-0000-0000-000000000001"),
@@ -114,8 +112,6 @@ class LookupTests(TestCase):
         ]:
             with self.subTest(lookup=lookup, value=value):
                 self.assertTrue(resources.filter(**{lookup: value}))
-
-        # Contains
 
     def test_localized_string_lookups(self):
         resources = SemanticResource.as_model("datatype_lookups")
@@ -125,6 +121,26 @@ class LookupTests(TestCase):
             ("string__any_lang_istartswith", "FORTY"),
             ("string__any_lang_contains", "fort"),
             ("string__any_lang_icontains", "FORT"),
+        ]:
+            with self.subTest(lookup=lookup, value=value):
+                self.assertTrue(resources.filter(**{lookup: value}))
+
+        # Negatives
+        for lookup, value in [
+            ("string__any_lang_startswith", "orty-two"),
+            ("string__any_lang_istartswith", "ORTY-TWO"),
+            ("string__any_lang_contains", "orty-three"),
+            ("string__any_lang_icontains", "ORTY-THREE"),
+        ]:
+            with self.subTest(lookup=lookup, value=value):
+                self.assertFalse(resources.filter(**{lookup: value}))
+
+    def test_resource_instance_lookups(self):
+        resources = SemanticResource.as_model("datatype_lookups")
+
+        for lookup, value in [
+            ("resource-instance__id", str(self.resource.pk)),
+            ("resource-instance-list__contains", str(self.resource.pk)),
         ]:
             with self.subTest(lookup=lookup, value=value):
                 self.assertTrue(resources.filter(**{lookup: value}))
