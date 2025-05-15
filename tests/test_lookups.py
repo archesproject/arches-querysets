@@ -3,6 +3,8 @@ from django.test import TestCase
 from arches.app.datatypes.datatypes import DataTypeFactory
 from arches.app.models.graph import Graph
 from arches.app.models.models import (
+    CardModel,
+    CardXNodeXWidget,
     DDataType,
     Node,
     NodeGroup,
@@ -47,6 +49,9 @@ class LookupTests(TestCase):
         )
         cls.grouping_node_n.nodegroup = cls.nodegroup_n
         cls.grouping_node_n.save()
+
+        CardModel.objects.create(nodegroup=cls.nodegroup_1, graph=cls.graph)
+        CardModel.objects.create(nodegroup=cls.nodegroup_n, graph=cls.graph)
 
         datatypes = DDataType.objects.all()
         data_nodes_1 = [
@@ -125,6 +130,16 @@ class LookupTests(TestCase):
                 if node.datatype in cls.sample_data
             },
         )
+
+        for node in data_nodes_1 + data_nodes_n:
+            if node.datatype == "semantic":
+                continue
+            widget = [dt.defaultwidget for dt in datatypes if dt.pk == node.datatype][0]
+            CardXNodeXWidget.objects.create(
+                card=node.nodegroup.cardmodel_set.first(),
+                node=node,
+                widget=widget,
+            )
 
     def test_cardinality_1_resource_lookups(self):
         resources = SemanticResource.as_model("datatype_lookups")
