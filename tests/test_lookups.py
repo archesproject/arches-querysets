@@ -51,7 +51,7 @@ class LookupTests(TestCase):
         datatypes = DDataType.objects.all()
         data_nodes_1 = [
             Node(
-                datatype=datatype,
+                datatype=datatype.pk,
                 alias=datatype.pk,
                 name=datatype.pk,
                 istopnode=False,
@@ -62,7 +62,7 @@ class LookupTests(TestCase):
         ]
         data_nodes_n = [
             Node(
-                datatype=datatype,
+                datatype=datatype.pk,
                 alias=datatype.pk + "-n",
                 name=datatype.pk + "-n",
                 istopnode=False,
@@ -110,9 +110,9 @@ class LookupTests(TestCase):
             nodegroup=cls.nodegroup_1,
             resourceinstance=cls.resource,
             data={
-                str(node.pk): cls.sample_data[node.datatype.pk]
+                str(node.pk): cls.sample_data[node.datatype]
                 for node in data_nodes_1
-                if node.datatype.pk in cls.sample_data
+                if node.datatype in cls.sample_data
             },
         )
 
@@ -120,9 +120,9 @@ class LookupTests(TestCase):
             nodegroup=cls.nodegroup_n,
             resourceinstance=cls.resource,
             data={
-                str(node.pk): cls.sample_data[node.datatype.pk]
+                str(node.pk): cls.sample_data[node.datatype]
                 for node in data_nodes_n
-                if node.datatype.pk in cls.sample_data
+                if node.datatype in cls.sample_data
             },
         )
 
