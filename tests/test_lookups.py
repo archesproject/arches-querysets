@@ -11,14 +11,15 @@ class LookupTests(GraphTestCase):
             ("boolean", True),
             ("number", 42.0),  # Use a float so that stringifying causes failure.
             ("url__url_label", "42.com"),
-            ("non-localized-string", "forty-two"),
+            ("non_localized_string", "forty-two"),
             ("string__en__value", "forty-two"),
             ("date", "2042-04-02"),
             # More natural lookups in test_resource_instance_lookups()
-            ("resource-instance__0__ontologyProperty", ""),
-            ("resource-instance-list__0__ontologyProperty", ""),
-            ("concept", "00000000-0000-0000-0000-000000000001"),
-            ("concept-list", ["00000000-0000-0000-0000-000000000001"]),
+            ("resource_instance__0__ontologyProperty", ""),
+            ("resource_instance_list__0__ontologyProperty", ""),
+            ("concept", str(self.value.pk)),
+            ("concept_list", [str(self.value.pk)]),
+            # ("node_value", "2042-04-02"),
         ]:
             with self.subTest(lookup=lookup, value=value):
                 self.assertTrue(resources.filter(**{lookup: value}))
@@ -28,17 +29,18 @@ class LookupTests(GraphTestCase):
 
         # Exact
         for lookup, value in [
-            # ("boolean-n__contains", True),
-            # ("number-n__contains", 42.0),  # Use a float so that stringifying causes failure.
+            # ("boolean_n__contains", True),
+            # ("number_n__contains", 42.0),  # Use a float so that stringifying causes failure.
             # ("url__url_label", "42.com"),
-            ("non-localized-string-n__contains", "forty-two"),
-            # ("string-n__en__value", "forty-two"),
-            # ("date-n__contains", "2042-04-02"),
+            ("non_localized_string_n__contains", "forty-two"),
+            # ("string_n__en__value", "forty-two"),
+            # ("date_n__contains", "2042-04-02"),
             # More natural lookups in test_resource_instance_lookups()
-            # ("resource-instance-n__0__ontologyProperty", ""),
-            # ("resource-instance-list-n__0__ontologyProperty", ""),
-            ("concept-n__contains", "00000000-0000-0000-0000-000000000001"),
-            # ("concept-list-n__contains", ["00000000-0000-0000-0000-000000000001"]),
+            # ("resource_instance_n__0__ontologyProperty", ""),
+            # ("resource_instance_list_n__0__ontologyProperty", ""),
+            ("concept_n__contains", str(self.value.pk)),
+            # ("concept_list_n__contains", [str(self.value.pk)]),
+            # ("node_value", "2042-04-02"),
         ]:
             with self.subTest(lookup=lookup, value=value):
                 self.assertTrue(resources.filter(**{lookup: value}))
@@ -69,8 +71,8 @@ class LookupTests(GraphTestCase):
         resources = SemanticResource.as_model("datatype_lookups")
 
         for lookup, value in [
-            ("resource-instance__id", str(self.resource.pk)),
-            ("resource-instance-list__contains", str(self.resource.pk)),
+            ("resource_instance__id", str(self.resource.pk)),
+            ("resource_instance_list__contains", str(self.resource.pk)),
         ]:
             with self.subTest(lookup=lookup, value=value):
                 self.assertTrue(resources.filter(**{lookup: value}))
