@@ -17,8 +17,8 @@ class LookupTests(GraphTestCase):
             # More natural lookups in test_resource_instance_lookups()
             ("resource_instance__0__ontologyProperty", ""),
             ("resource_instance_list__0__ontologyProperty", ""),
-            ("concept", str(self.value.pk)),
-            ("concept_list", [str(self.value.pk)]),
+            ("concept", str(self.concept_value.pk)),
+            ("concept_list", [str(self.concept_value.pk)]),
             # TODO: More natural lookups
             ("node_value", str(self.cardinality_1_tile.pk)),
         ]:
@@ -39,7 +39,7 @@ class LookupTests(GraphTestCase):
             # More natural lookups in test_resource_instance_lookups()
             # ("resource_instance_n__0__ontologyProperty", ""),
             # ("resource_instance_list_n__0__ontologyProperty", ""),
-            ("concept_n__contains", str(self.value.pk)),
+            ("concept_n__contains", str(self.concept_value.pk)),
             # ("concept_list_n__contains", [str(self.value.pk)]),
             # TODO: More natural lookups
             # ("node_value_n__contains", [str(self.cardinality_n_tile.pk)]),

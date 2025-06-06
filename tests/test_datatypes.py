@@ -4,7 +4,7 @@ from arches_querysets.models import SemanticResource
 from tests.utils import GraphTestCase
 
 
-class DatatypeTests(GraphTestCase):
+class DatatypeRepresentationTests(GraphTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
@@ -51,26 +51,40 @@ class DatatypeTests(GraphTestCase):
                     self.assertEqual(value.get("display_value"), representation)
 
     def test_as_representation_interchange_values(self):
-        # TODO: assert values -- notice concepts still have a Value instance
         interchange_values = {
             # Start with the tile representation.
             **self.sample_data_1,
             # Some interchange values are different.
             # String resolves to active language.
             "string": "forty-two",
-            # Resource Instance{list} resolves to stringified UUID. (TODO: unstring?)
-            "resource-instance": [
+            # Resource Instance resolves to the pk.
+            "resource-instance": str(self.resource.pk),
+            # Resource Instance list resolves to a details array.
+            "resource-instance-list": [
                 {
-                    "resourceId": str(self.resource.pk),
+                    "resource_id": str(self.resource.pk),
                     "display_value": self.resource.descriptors["en"]["name"],
                 }
             ],
-            # Concept{list} resolves to concept value.
-            # TODO...
+            # Concept resolves to a single detail object.
+            "concept": {
+                "valueid": "d8c60bf4-e786-11e6-905a-b756ec83dad5",
+                "concept_id": "00000000-0000-0000-0000-000000000001",
+                "valuetype_id": "prefLabel",
+                "value": "Arches",
+                "language_id": "en",
+            },
+            # Concept list resolves to a details array.
+            "concept-list": [
+                {
+                    "valueid": "d8c60bf4-e786-11e6-905a-b756ec83dad5",
+                    "concept_id": "00000000-0000-0000-0000-000000000001",
+                    "valuetype_id": "prefLabel",
+                    "value": "Arches",
+                    "language_id": "en",
+                }
+            ],
         }
-        interchange_values["resource-instance-list"] = interchange_values[
-            "resource-instance"
-        ]
 
         # The interchange value is available on the nodegroup .aliased_data.
         for datatype, interchange_value in interchange_values.items():
@@ -83,3 +97,40 @@ class DatatypeTests(GraphTestCase):
                     lookup = node_alias if cardinality == "1" else node_alias + "_n"
                     value = getattr(aliased_data, lookup)
                     self.assertEqual(value.get("interchange_value"), interchange_value)
+
+
+class DatatypePythonTests(GraphTestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        resources = SemanticResource.as_model(
+            "datatype_lookups", as_representation=False
+        )
+        cls.semantic_resource = resources.get(pk=cls.resource.pk)
+        cls.datatype_1 = cls.semantic_resource.aliased_data.datatypes_1
+        cls.datatype_n = cls.semantic_resource.aliased_data.datatypes_n
+
+    def test_python_values(self):
+        python_values = {
+            # Start with the tile representation.
+            **self.sample_data_1,
+            # Some python values are different.
+            # Resource Instances become model instances
+            "resource-instance": self.resource,
+            "resource-instance-list": [self.resource],
+            # Concepts become concept value model instances
+            "concept": self.concept_value,
+            "concept-list": [self.concept_value],
+        }
+
+        # The python value is available on the nodegroup .aliased_data.
+        for datatype, python_value in python_values.items():
+            node_alias = datatype.replace("-", "_")
+            for aliased_data, cardinality in [
+                (self.datatype_1.aliased_data, "1"),
+                (self.datatype_n[0].aliased_data, "n"),
+            ]:
+                with self.subTest(datatype=datatype, cardinality=cardinality):
+                    lookup = node_alias if cardinality == "1" else node_alias + "_n"
+                    value = getattr(aliased_data, lookup)
+                    self.assertEqual(value, python_value)
