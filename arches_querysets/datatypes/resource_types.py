@@ -122,6 +122,8 @@ class ResourceInstanceDataType(datatypes.ResourceInstanceDataType):
         return resource_details
 
     def get_interchange_value(self, value, *, details, **kwargs):
+        if not value:
+            return []
         if details is None:
             self.get_details(value)
         resource_display_value_map = {
