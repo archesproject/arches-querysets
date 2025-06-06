@@ -192,28 +192,6 @@ class ResourceAliasedDataSerializer(serializers.Serializer, NodeFetcherMixin):
 
 
 class TileAliasedDataSerializer(serializers.ModelSerializer, NodeFetcherMixin):
-    datatype_field_map = {
-        "string": models.JSONField(null=True),
-        "number": models.FloatField(null=True),
-        "concept": models.JSONField(null=True),
-        "concept-list": models.JSONField(null=True),
-        "date": models.DateField(null=True),
-        "node-value": models.CharField(null=True),  # XXX
-        "edtf": models.CharField(null=True),  # XXX
-        "annotation": models.CharField(null=True),  # XXX
-        "url": models.JSONField(null=True),  # XXX
-        "resource-instance": models.JSONField(null=True),
-        "resource-instance-list": models.JSONField(null=True),
-        "boolean": models.BooleanField(null=True),
-        "domain-value": models.JSONField(null=True),
-        "domain-value-list": models.JSONField(null=True),
-        "non-localized-string": models.CharField(null=True),
-        "geojson-feature-collection": models.CharField(null=True),  # XXX
-        "file-list": models.JSONField(null=True),
-        # TODO: reference datatype should supply this itself somehow.
-        "reference": models.JSONField(null=True),
-    }
-
     class Meta:
         model = SemanticTile
         graph_slug = None
@@ -316,22 +294,19 @@ class TileAliasedDataSerializer(serializers.ModelSerializer, NodeFetcherMixin):
                 f"Node with alias {field_name} not found in graph {self.graph_slug}"
             )
 
-        model_field = deepcopy(self.datatype_field_map[node.datatype])
-        if model_field is None:
-            if node.nodegroup.grouping_node == node:
-                sortorder = 0
-                if node.nodegroup.cardmodel_set.all():
-                    sortorder = node.nodegroup.cardmodel_set.all()[0].sortorder
-                model_field = _make_tile_serializer(
-                    slug=self.graph_slug,
-                    nodegroup_alias=node.alias,
-                    cardinality=node.nodegroup.cardinality,
-                    graph_nodes=self.graph_nodes,
-                    sortorder=sortorder,
-                )
-            else:
-                msg = _("Field missing for datatype: {}").format(node.datatype)
-                raise NotImplementedError(msg)
+        if node.datatype == "semantic" and node.nodegroup.grouping_node == node:
+            sortorder = 0
+            if node.nodegroup.cardmodel_set.all():
+                sortorder = node.nodegroup.cardmodel_set.all()[0].sortorder
+            model_field = _make_tile_serializer(
+                slug=self.graph_slug,
+                nodegroup_alias=node.alias,
+                cardinality=node.nodegroup.cardinality,
+                graph_nodes=self.graph_nodes,
+                sortorder=sortorder,
+            )
+        else:
+            model_field = models.JSONField(null=True)
         model_field.model = model_class
         model_field.blank = not node.isrequired
         try:

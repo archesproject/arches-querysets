@@ -7,6 +7,8 @@ inputs:
   project-name:
     description: 'String denoting the name of the project'
     required: true
+  arches-version:
+    description: 'String to be used in pip install arches~= command'
   secrets:
     description: 'Secrets from main.yml as JSON'
 runs:
@@ -30,7 +32,13 @@ runs:
         pip install . --group dev
         echo Python packages installed
       shell: bash
-    
+
+    - name: Re-install Arches from testing matrix
+      if: ${{ inputs.arches-version }}
+      run: |
+        pip install arches~=${{ inputs.arches-version }}
+      shell: bash
+
     - name: Ensure frontend configuration files exist
       run: |
           python manage.py check
@@ -47,6 +55,7 @@ runs:
       shell: bash
 
     - name: Webpack frontend files
+      if: inputs.arches-version != '7.6'
       run: |
           npm run build_test
       shell: bash
