@@ -103,10 +103,7 @@ class GraphTestCase(TestCase):
         ]
         for node in cls.nodes:
             if node.datatype == "node-value":
-                if node.nodegroup.cardinality == "1":
-                    node.config["nodeid"] = str(cls.date_node_1.pk)
-                else:
-                    node.config["nodeid"] = str(cls.date_node_n.pk)
+                node.config["nodeid"] = str(cls.date_node_1.pk)
                 node.save()
 
     @classmethod
@@ -179,7 +176,7 @@ class GraphTestCase(TestCase):
         }
         cls.sample_data_n = {
             **cls.sample_data_1,
-            "node-value": str(cls.cardinality_n_tile.pk),
+            # "node-value": str(cls.cardinality_n_tile.pk),
         }
 
         cls.cardinality_1_tile.data = {
