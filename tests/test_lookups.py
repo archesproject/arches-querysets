@@ -19,7 +19,8 @@ class LookupTests(GraphTestCase):
             ("resource_instance_list__0__ontologyProperty", ""),
             ("concept", str(self.value.pk)),
             ("concept_list", [str(self.value.pk)]),
-            # ("node_value", "2042-04-02"),
+            # TODO: More natural lookups
+            ("node_value", str(self.cardinality_1_tile.pk)),
         ]:
             with self.subTest(lookup=lookup, value=value):
                 self.assertTrue(resources.filter(**{lookup: value}))
@@ -40,7 +41,8 @@ class LookupTests(GraphTestCase):
             # ("resource_instance_list_n__0__ontologyProperty", ""),
             ("concept_n__contains", str(self.value.pk)),
             # ("concept_list_n__contains", [str(self.value.pk)]),
-            # ("node_value", "2042-04-02"),
+            # TODO: More natural lookups
+            # ("node_value_n__contains", [str(self.cardinality_n_tile.pk)]),
         ]:
             with self.subTest(lookup=lookup, value=value):
                 self.assertTrue(resources.filter(**{lookup: value}))
