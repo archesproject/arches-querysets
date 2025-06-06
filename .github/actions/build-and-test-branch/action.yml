@@ -55,6 +55,7 @@ runs:
       shell: bash
 
     - name: Webpack frontend files
+      if: inputs.arches-version != '7.6'
       run: |
           npm run build_test
       shell: bash
