@@ -138,7 +138,7 @@ class GraphTestCase(TestCase):
             graph=cls.graph, descriptors={"en": {"name": "Test Resource"}}
         )
         cls.concept = Concept.objects.get(pk="00000000-0000-0000-0000-000000000001")
-        cls.value = cls.concept.value_set.get()
+        cls.concept_value = cls.concept.value_set.get()
 
         cls.cardinality_1_tile = TileModel.objects.create(
             nodegroup=cls.nodegroup_1,
@@ -168,8 +168,8 @@ class GraphTestCase(TestCase):
             "date": "2042-04-02",
             "resource-instance": ri_dt.transform_value_for_tile(cls.resource),
             "resource-instance-list": ri_list_dt.transform_value_for_tile(cls.resource),
-            "concept": str(cls.value.pk),
-            "concept-list": [str(cls.value.pk)],
+            "concept": str(cls.concept_value.pk),
+            "concept-list": [str(cls.concept_value.pk)],
             "node-value": str(cls.cardinality_1_tile.pk),
             # reference (?)
             # randomly create geometry
