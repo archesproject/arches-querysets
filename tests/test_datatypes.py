@@ -55,8 +55,6 @@ class DatatypeRepresentationTests(GraphTestCase):
             # Start with the tile representation.
             **self.sample_data_1,
             # Some interchange values are different.
-            # String resolves to active language.
-            "string": "forty-two",
             # Resource Instance resolves to the pk.
             "resource-instance": str(self.resource.pk),
             # Resource Instance list resolves to a details array.
