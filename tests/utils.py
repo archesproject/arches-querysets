@@ -29,8 +29,10 @@ class GraphTestCase(TestCase):
         # cls.create_edges() -- edges not fathomed
         cls.create_cards()
         cls.create_widgets()
-        cls.create_tiles()
-        cls.create_resource_x_resources()
+        cls.create_resources()
+        cls.create_tiles_with_data()
+        cls.create_tiles_with_none()
+        cls.create_relations()
 
     @classmethod
     def create_graph(cls):
@@ -103,7 +105,10 @@ class GraphTestCase(TestCase):
         ]
         for node in cls.nodes:
             if node.datatype == "node-value":
-                node.config["nodeid"] = str(cls.date_node_1.pk)
+                if node.nodegroup.cardinality == "1":
+                    node.config["nodeid"] = str(cls.date_node_1.pk)
+                else:
+                    node.config["nodeid"] = str(cls.date_node_n.pk)
                 node.save()
 
     @classmethod
@@ -130,24 +135,32 @@ class GraphTestCase(TestCase):
         CardXNodeXWidget.objects.bulk_create(node_widgets)
 
     @classmethod
-    def create_tiles(cls):
+    def create_resources(cls):
+        cls.resource_42 = ResourceInstance.objects.create(
+            graph=cls.graph,
+            descriptors={"en": {"name": "Resource referencing 42"}},
+        )
+        cls.resource_none = ResourceInstance.objects.create(
+            graph=cls.graph,
+            descriptors={"en": {"name": "Resource referencing None"}},
+        )
+
+    @classmethod
+    def create_tiles_with_data(cls):
         ri_dt = cls.datatype_factory.get_instance("resource-instance")
         ri_list_dt = cls.datatype_factory.get_instance("resource-instance-list")
 
-        cls.resource = ResourceInstance.objects.create(
-            graph=cls.graph, descriptors={"en": {"name": "Test Resource"}}
-        )
         cls.concept = Concept.objects.get(pk="00000000-0000-0000-0000-000000000001")
         cls.concept_value = cls.concept.value_set.get()
 
         cls.cardinality_1_tile = TileModel.objects.create(
             nodegroup=cls.nodegroup_1,
-            resourceinstance=cls.resource,
+            resourceinstance=cls.resource_42,
             data={},
         )
         cls.cardinality_n_tile = TileModel.objects.create(
             nodegroup=cls.nodegroup_n,
-            resourceinstance=cls.resource,
+            resourceinstance=cls.resource_42,
             data={},
         )
 
@@ -166,8 +179,10 @@ class GraphTestCase(TestCase):
                 "url_label": "42.com",
             },
             "date": "2042-04-02",
-            "resource-instance": ri_dt.transform_value_for_tile(cls.resource),
-            "resource-instance-list": ri_list_dt.transform_value_for_tile(cls.resource),
+            "resource-instance": ri_dt.transform_value_for_tile(cls.resource_42),
+            "resource-instance-list": ri_list_dt.transform_value_for_tile(
+                cls.resource_42
+            ),
             "concept": str(cls.concept_value.pk),
             "concept-list": [str(cls.concept_value.pk)],
             "node-value": str(cls.cardinality_1_tile.pk),
@@ -176,7 +191,7 @@ class GraphTestCase(TestCase):
         }
         cls.sample_data_n = {
             **cls.sample_data_1,
-            # "node-value": str(cls.cardinality_n_tile.pk),
+            "node-value": str(cls.cardinality_n_tile.pk),
         }
 
         cls.cardinality_1_tile.data = {
@@ -199,7 +214,20 @@ class GraphTestCase(TestCase):
         cls.cardinality_n_tile.save()
 
     @classmethod
-    def create_resource_x_resources(cls):
+    def create_tiles_with_none(cls):
+        cls.cardinality_1_tile_none = TileModel.objects.create(
+            nodegroup=cls.nodegroup_1,
+            resourceinstance=cls.resource_none,
+            data={nodeid: None for nodeid in cls.sample_data_1},
+        )
+        cls.cardinality_n_tile_none = TileModel.objects.create(
+            nodegroup=cls.nodegroup_n,
+            resourceinstance=cls.resource_none,
+            data={nodeid: None for nodeid in cls.sample_data_n},
+        )
+
+    @classmethod
+    def create_relations(cls):
         if arches_version < (8, 0):
             from_resource_attr = "resourceinstanceidto"
             to_resource_attr = "resourceinstanceidfrom"
@@ -217,8 +245,8 @@ class GraphTestCase(TestCase):
         rxrs = [
             ResourceXResource(
                 **{
-                    from_resource_attr: cls.resource,
-                    to_resource_attr: cls.resource,
+                    from_resource_attr: cls.resource_42,
+                    to_resource_attr: cls.resource_42,
                     from_graph_attr: cls.graph,
                     to_graph_attr: cls.graph,
                     tile_attr: cls.cardinality_1_tile,
@@ -227,8 +255,8 @@ class GraphTestCase(TestCase):
             ),
             ResourceXResource(
                 **{
-                    from_resource_attr: cls.resource,
-                    to_resource_attr: cls.resource,
+                    from_resource_attr: cls.resource_42,
+                    to_resource_attr: cls.resource_42,
                     from_graph_attr: cls.graph,
                     to_graph_attr: cls.graph,
                     tile_attr: cls.cardinality_n_tile,
@@ -237,8 +265,8 @@ class GraphTestCase(TestCase):
             ),
             ResourceXResource(
                 **{
-                    from_resource_attr: cls.resource,
-                    to_resource_attr: cls.resource,
+                    from_resource_attr: cls.resource_42,
+                    to_resource_attr: cls.resource_42,
                     from_graph_attr: cls.graph,
                     to_graph_attr: cls.graph,
                     tile_attr: cls.cardinality_1_tile,
@@ -247,8 +275,8 @@ class GraphTestCase(TestCase):
             ),
             ResourceXResource(
                 **{
-                    from_resource_attr: cls.resource,
-                    to_resource_attr: cls.resource,
+                    from_resource_attr: cls.resource_42,
+                    to_resource_attr: cls.resource_42,
                     from_graph_attr: cls.graph,
                     to_graph_attr: cls.graph,
                     tile_attr: cls.cardinality_n_tile,
