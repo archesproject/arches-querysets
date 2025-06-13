@@ -1,5 +1,3 @@
-import json
-
 from arches_querysets.models import SemanticResource
 from tests.utils import GraphTestCase
 
@@ -11,9 +9,9 @@ class DatatypeRepresentationTests(GraphTestCase):
         resources = SemanticResource.as_model(
             "datatype_lookups", as_representation=True
         )
-        cls.semantic_resource = resources.get(pk=cls.resource.pk)
-        cls.datatype_1 = cls.semantic_resource.aliased_data.datatypes_1
-        cls.datatype_n = cls.semantic_resource.aliased_data.datatypes_n
+        cls.semantic_resource_42 = resources.get(pk=cls.resource_42.pk)
+        cls.datatype_1 = cls.semantic_resource_42.aliased_data.datatypes_1
+        cls.datatype_n = cls.semantic_resource_42.aliased_data.datatypes_n
 
     def test_as_representation_display_values(self):
         display_values = {
@@ -27,8 +25,8 @@ class DatatypeRepresentationTests(GraphTestCase):
             # String resolves to active language.
             "string": "forty-two",
             # Resource Instance{list} resolves to localized name.
-            "resource-instance": "Test Resource",
-            "resource-instance-list": "Test Resource",
+            "resource-instance": "Resource referencing 42",
+            "resource-instance-list": "Resource referencing 42",
             # Concept{list} resolves to concept value.
             "concept": "Arches",
             "concept-list": "Arches",
@@ -56,12 +54,12 @@ class DatatypeRepresentationTests(GraphTestCase):
             **self.sample_data_1,
             # Some interchange values are different.
             # Resource Instance resolves to the pk.
-            "resource-instance": str(self.resource.pk),
+            "resource-instance": str(self.resource_42.pk),
             # Resource Instance list resolves to a details array.
             "resource-instance-list": [
                 {
-                    "resource_id": str(self.resource.pk),
-                    "display_value": self.resource.descriptors["en"]["name"],
+                    "resource_id": str(self.resource_42.pk),
+                    "display_value": self.resource_42.descriptors["en"]["name"],
                 }
             ],
             # Concept resolves to a single detail object.
@@ -93,6 +91,8 @@ class DatatypeRepresentationTests(GraphTestCase):
             ]:
                 with self.subTest(datatype=datatype, cardinality=cardinality):
                     lookup = node_alias if cardinality == "1" else node_alias + "_n"
+                    if lookup == "node_value_n":
+                        interchange_value = self.sample_data_n["node-value"]
                     value = getattr(aliased_data, lookup)
                     self.assertEqual(value.get("interchange_value"), interchange_value)
 
@@ -104,7 +104,7 @@ class DatatypePythonTests(GraphTestCase):
         resources = SemanticResource.as_model(
             "datatype_lookups", as_representation=False
         )
-        cls.semantic_resource = resources.get(pk=cls.resource.pk)
+        cls.semantic_resource = resources.get(pk=cls.resource_42.pk)
         cls.datatype_1 = cls.semantic_resource.aliased_data.datatypes_1
         cls.datatype_n = cls.semantic_resource.aliased_data.datatypes_n
 
@@ -114,8 +114,8 @@ class DatatypePythonTests(GraphTestCase):
             **self.sample_data_1,
             # Some python values are different.
             # Resource Instances become model instances
-            "resource-instance": self.resource,
-            "resource-instance-list": [self.resource],
+            "resource-instance": self.resource_42,
+            "resource-instance-list": [self.resource_42],
             # Concepts become concept value model instances
             "concept": self.concept_value,
             "concept-list": [self.concept_value],
@@ -130,5 +130,7 @@ class DatatypePythonTests(GraphTestCase):
             ]:
                 with self.subTest(datatype=datatype, cardinality=cardinality):
                     lookup = node_alias if cardinality == "1" else node_alias + "_n"
+                    if lookup == "node_value_n":
+                        python_value = self.sample_data_n["node-value"]
                     value = getattr(aliased_data, lookup)
                     self.assertEqual(value, python_value)

@@ -73,8 +73,8 @@ class LookupTests(GraphTestCase):
         resources = SemanticResource.as_model("datatype_lookups")
 
         for lookup, value in [
-            ("resource_instance__id", str(self.resource.pk)),
-            ("resource_instance_list__contains", str(self.resource.pk)),
+            ("resource_instance__id", str(self.resource_42.pk)),
+            ("resource_instance_list__contains", str(self.resource_42.pk)),
         ]:
             with self.subTest(lookup=lookup, value=value):
                 self.assertTrue(resources.filter(**{lookup: value}))
