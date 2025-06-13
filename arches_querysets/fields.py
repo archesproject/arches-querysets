@@ -34,5 +34,5 @@ class Cardinality1ResourceInstanceListField(ResourceInstanceListField):
     pass
 
 
-class Cardinality1TextField(TextField):
+class StringField(JSONField):
     pass
