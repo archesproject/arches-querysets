@@ -10,8 +10,11 @@ class DatatypeRepresentationTests(GraphTestCase):
             "datatype_lookups", as_representation=True
         )
         cls.semantic_resource_42 = resources.get(pk=cls.resource_42.pk)
+        cls.semantic_resource_none = resources.get(pk=cls.resource_none.pk)
         cls.datatype_1 = cls.semantic_resource_42.aliased_data.datatypes_1
         cls.datatype_n = cls.semantic_resource_42.aliased_data.datatypes_n
+        cls.datatype_1_none = cls.semantic_resource_none.aliased_data.datatypes_1
+        cls.datatype_n_none = cls.semantic_resource_none.aliased_data.datatypes_n
 
     def test_as_representation_display_values(self):
         display_values = {
@@ -39,14 +42,20 @@ class DatatypeRepresentationTests(GraphTestCase):
         # The representation is available on the nodegroup .aliased_data.
         for datatype, representation in display_values.items():
             node_alias = datatype.replace("-", "_")
-            for aliased_data, cardinality in [
-                (self.datatype_1.aliased_data, "1"),
-                (self.datatype_n[0].aliased_data, "n"),
+            for resource_data, resource_data_none, cardinality in [
+                (self.datatype_1.aliased_data, self.datatype_1_none.aliased_data, "1"),
+                (
+                    self.datatype_n[0].aliased_data,
+                    self.datatype_n_none[0].aliased_data,
+                    "n",
+                ),
             ]:
                 with self.subTest(datatype=datatype, cardinality=cardinality):
                     lookup = node_alias if cardinality == "1" else node_alias + "_n"
-                    value = getattr(aliased_data, lookup)
+                    value = getattr(resource_data, lookup)
                     self.assertEqual(value.get("display_value"), representation)
+                    value = getattr(resource_data_none, lookup)
+                    self.assertEqual(value.get("display_value"), "(Empty)")
 
     def test_as_representation_interchange_values(self):
         interchange_values = {
@@ -85,16 +94,22 @@ class DatatypeRepresentationTests(GraphTestCase):
         # The interchange value is available on the nodegroup .aliased_data.
         for datatype, interchange_value in interchange_values.items():
             node_alias = datatype.replace("-", "_")
-            for aliased_data, cardinality in [
-                (self.datatype_1.aliased_data, "1"),
-                (self.datatype_n[0].aliased_data, "n"),
+            for resource_data, resource_data_none, cardinality in [
+                (self.datatype_1.aliased_data, self.datatype_1_none.aliased_data, "1"),
+                (
+                    self.datatype_n[0].aliased_data,
+                    self.datatype_n_none[0].aliased_data,
+                    "n",
+                ),
             ]:
-                with self.subTest(datatype=datatype, cardinality=cardinality):
-                    lookup = node_alias if cardinality == "1" else node_alias + "_n"
-                    if lookup == "node_value_n":
-                        interchange_value = self.sample_data_n["node-value"]
-                    value = getattr(aliased_data, lookup)
+                lookup = node_alias if cardinality == "1" else node_alias + "_n"
+                if lookup == "node_value_n":
+                    interchange_value = self.sample_data_n["node-value"]
+                with self.subTest(lookup=lookup):
+                    value = getattr(resource_data, lookup)
                     self.assertEqual(value.get("interchange_value"), interchange_value)
+                    value = getattr(resource_data_none, lookup)
+                    self.assertIsNone(value.get("interchange_value"), value)
 
 
 class DatatypePythonTests(GraphTestCase):
@@ -105,8 +120,11 @@ class DatatypePythonTests(GraphTestCase):
             "datatype_lookups", as_representation=False
         )
         cls.semantic_resource = resources.get(pk=cls.resource_42.pk)
+        cls.semantic_resource_none = resources.get(pk=cls.resource_none.pk)
         cls.datatype_1 = cls.semantic_resource.aliased_data.datatypes_1
         cls.datatype_n = cls.semantic_resource.aliased_data.datatypes_n
+        cls.datatype_1_none = cls.semantic_resource_none.aliased_data.datatypes_1
+        cls.datatype_n_none = cls.semantic_resource_none.aliased_data.datatypes_n
 
     def test_python_values(self):
         python_values = {
@@ -124,13 +142,19 @@ class DatatypePythonTests(GraphTestCase):
         # The python value is available on the nodegroup .aliased_data.
         for datatype, python_value in python_values.items():
             node_alias = datatype.replace("-", "_")
-            for aliased_data, cardinality in [
-                (self.datatype_1.aliased_data, "1"),
-                (self.datatype_n[0].aliased_data, "n"),
+            for resource_data, resource_data_none, cardinality in [
+                (self.datatype_1.aliased_data, self.datatype_1_none.aliased_data, "1"),
+                (
+                    self.datatype_n[0].aliased_data,
+                    self.datatype_n_none[0].aliased_data,
+                    "n",
+                ),
             ]:
-                with self.subTest(datatype=datatype, cardinality=cardinality):
-                    lookup = node_alias if cardinality == "1" else node_alias + "_n"
-                    if lookup == "node_value_n":
-                        python_value = self.sample_data_n["node-value"]
-                    value = getattr(aliased_data, lookup)
+                lookup = node_alias if cardinality == "1" else node_alias + "_n"
+                if lookup == "node_value_n":
+                    python_value = self.sample_data_n["node-value"]
+                with self.subTest(lookup=lookup):
+                    value = getattr(resource_data, lookup)
                     self.assertEqual(value, python_value)
+                    value = getattr(resource_data_none, lookup)
+                    self.assertIsNone(value)
