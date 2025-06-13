@@ -30,19 +30,19 @@ class LookupTests(GraphTestCase):
 
         # Exact
         for lookup, value in [
-            # ("boolean_n__contains", True),
-            # ("number_n__contains", 42.0),  # Use a float so that stringifying causes failure.
-            # ("url__url_label", "42.com"),
-            ("non_localized_string_n__contains", "forty-two"),
-            # ("string_n__en__value", "forty-two"),
-            # ("date_n__contains", "2042-04-02"),
+            ("boolean_n__contains", [True]),
+            ("number_n__contains", [42.0]),  # Use a float: stringifying causes failure.
+            # ("url_n__url_label", "42.com"),
+            ("non_localized_string_n__contains", ["forty-two"]),
+            # ("string_n__en__value", ["forty-two"]),
+            ("date_n__contains", ["2042-04-02"]),
             # More natural lookups in test_resource_instance_lookups()
-            # ("resource_instance_n__0__ontologyProperty", ""),
-            # ("resource_instance_list_n__0__ontologyProperty", ""),
-            ("concept_n__contains", str(self.concept_value.pk)),
-            # ("concept_list_n__contains", [str(self.value.pk)]),
+            # ("resource_instance_n__0__ontologyProperty", [""]),
+            # ("resource_instance_list_n__0__ontologyProperty", [""]),
+            ("concept_n__contains", [str(self.concept_value.pk)]),
+            # ("concept_list_n__contains", [[str(self.concept_value.pk)]]),
             # TODO: More natural lookups
-            # ("node_value_n__contains", [str(self.cardinality_n_tile.pk)]),
+            ("node_value_n__contains", [str(self.cardinality_n_tile.pk)]),
         ]:
             with self.subTest(lookup=lookup, value=value):
                 self.assertTrue(resources.filter(**{lookup: value}))
