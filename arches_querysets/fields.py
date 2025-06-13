@@ -1,7 +1,7 @@
 """Wrapping the Django fields allows registering lookups per datatype."""
 
 from django.contrib.postgres.fields import ArrayField
-from django.db.models import DateTimeField, JSONField, TextField
+from django.db.models import DateTimeField, JSONField
 
 
 class CardinalityNField(ArrayField):
