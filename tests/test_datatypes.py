@@ -34,8 +34,8 @@ class DatatypeRepresentationTests(GraphTestCase):
             "concept-list": "Arches",
             # Node value resolves to node value.
             "node-value": self.sample_data_1["date"],
-            # BUG: URL resolves to the entire object.
-            "url": json.dumps(self.sample_data_1["url"]),
+            # URL resolves to label.
+            "url": self.sample_data_1["url"]["url_label"],
         }
 
         # The representation is available on the nodegroup .aliased_data.
