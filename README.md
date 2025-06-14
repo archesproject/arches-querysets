@@ -58,7 +58,7 @@ In brief:
     - Unknown status of custom/future datatypes
 - [flaxandteal/arches-orm](https://flaxandteal.github.io/arches-orm/docs/quickstart/)
     - Server-side access to pythonic resource models after fetching them from the database
-    - Designed to wrap other backends besides Postgres, e.g. SpatiaLite
+    - Unified abstraction layer for resources, whether from Django, Arches APIs or JSON exports
 
 
 Factors differentiating the arches-querysets approach include:
