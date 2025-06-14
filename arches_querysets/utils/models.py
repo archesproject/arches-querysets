@@ -2,31 +2,76 @@ from django.contrib.postgres.expressions import ArraySubquery
 from django.contrib.postgres.fields import ArrayField
 from django.db.models import (
     BooleanField,
+    Case,
     DateTimeField,
+    ExpressionWrapper,
     F,
     FloatField,
+    JSONField,
     OuterRef,
     TextField,
     UUIDField,
+    Value,
+    When,
 )
-from django.db.models import JSONField
 from django.db.models.functions import Cast
 from django.db.models.fields.json import KT
+from django.utils.functional import cached_property
 
 from arches import VERSION as arches_version
 from arches.app.models.models import ResourceInstance, TileModel
 from arches.app.models.utils import field_names
 
 from arches_querysets.fields import (
-    Cardinality1DateTimeField,
-    Cardinality1JSONField,
-    Cardinality1ResourceInstanceField,
-    Cardinality1ResourceInstanceListField,
-    Cardinality1TextField,
-    CardinalityNField,
+    CardinalityNResourceInstanceField,
+    CardinalityNStringField,
     ResourceInstanceField,
     ResourceInstanceListField,
+    StringField,
 )
+
+
+DATATYPES_NEEDING_KEY_TEXT_TRANSFORM = {
+    "non-localized-string",
+    "date",
+    "concept",
+    "node-value",
+}
+DATATYPES_NEEDING_CAST = {"boolean", "date", "number"}
+DATATYPE_OUTPUT_FIELDS = {
+    "boolean": BooleanField(),
+    "number": FloatField(),
+    "non-localized-string": TextField(),
+    "date": DateTimeField(),
+    "string": StringField(),
+    "url": JSONField(),
+    "resource-instance": ResourceInstanceField(),
+    "resource-instance-list": ResourceInstanceListField(),
+    "concept": UUIDField(),
+    "concept-list": JSONField(),
+    "node-value": UUIDField(),
+}
+
+
+class CardinalityNSubquery(ArraySubquery):
+    @cached_property
+    def output_field(self):
+        match self.query.output_field:
+            case ResourceInstanceField():
+                array_wrapper = CardinalityNResourceInstanceField
+            # case ResourceInstanceListField():
+            #     array_wrapper = CardinalityNResourceInstanceListField
+            case StringField():
+                array_wrapper = CardinalityNStringField
+            # case UUIDField():
+            #     array_wrapper = CardinalityNUUIDField
+            # case JSONField():  # concept-list, url
+            #     array_wrapper = ArrayTextField
+            # case TextField():
+            #     array_wrapper = CardinalityNTextField
+            case _:
+                array_wrapper = ArrayField
+        return array_wrapper(self.query.output_field)
 
 
 def field_attnames(instance_or_class):
@@ -93,7 +138,7 @@ def get_tile_values_for_resource(node, permitted_nodes):
     are cardinality-N parents anywhere.
     """
     many = any_nodegroup_in_hierarchy_is_cardinality_n(node.nodegroup, permitted_nodes)
-    expression, field = get_node_value_expression_and_output_field(node)
+    expression = get_node_value_expression(node, many)
     tile_query = (
         TileModel.objects.filter(
             nodegroup_id=node.nodegroup_id,
@@ -105,51 +150,26 @@ def get_tile_values_for_resource(node, permitted_nodes):
     )
 
     if many:
-        return ArraySubquery(
-            tile_query, output_field=CardinalityNField(base_field=field)
-        )
-
-    match field:
-        case BooleanField() | FloatField() | ArrayField():
-            output_field = field
-        case DateTimeField():
-            output_field = Cardinality1DateTimeField()
-        case ResourceInstanceField():
-            output_field = Cardinality1ResourceInstanceField()
-        case ResourceInstanceListField():
-            output_field = Cardinality1ResourceInstanceListField()
-        case JSONField():
-            output_field = Cardinality1JSONField()
-        case _:
-            output_field = Cardinality1TextField()
-    return Cast(tile_query, output_field=output_field)
+        # return ArraySubquery(tile_query)
+        return CardinalityNSubquery(tile_query)
+    else:
+        return tile_query
 
 
-def get_node_value_expression_and_output_field(node):
-    match node.datatype:
-        case "boolean":
-            return F(f"data__{node.pk}"), BooleanField()
-        case "number":
-            return F(f"data__{node.pk}"), FloatField()
-        case "non-localized-string":
-            return KT(f"data__{node.pk}"), TextField()
-        case "date":
-            return (
-                Cast(KT(f"data__{node.pk}"), output_field=DateTimeField()),
-                DateTimeField(),
-            )
-        case "string" | "url":
-            return F(f"data__{node.pk}"), JSONField()
-        case "resource-instance":
-            return F(f"data__{node.pk}"), ResourceInstanceField()
-        case "resource-instance-list":
-            return F(f"data__{node.pk}"), ResourceInstanceListField()
-        case "concept":
-            return KT(f"data__{node.pk}"), UUIDField()
-        case "concept-list":
-            return F(f"data__{node.pk}"), JSONField()
-        case _:
-            return F(f"data__{node.pk}"), TextField()
+def get_node_value_expression(node, many: bool):
+    node_lookup = f"data__{node.pk}"
+    output_field = DATATYPE_OUTPUT_FIELDS.get(node.datatype, TextField())
+    if node.datatype in DATATYPES_NEEDING_KEY_TEXT_TRANSFORM:
+        default = KT(node_lookup)
+    else:
+        default = F(node_lookup)
+    if node.datatype in DATATYPES_NEEDING_CAST or many:
+        default = Cast(default, output_field=output_field)
+    else:
+        default = ExpressionWrapper(default, output_field=output_field)
+    if many:
+        output_field = ArrayField(base_field=output_field)
+    return Case(When(**{node_lookup: None}, then=Value(None)), default=default)
 
 
 def get_nodegroups_here_and_below(start_nodegroup):
