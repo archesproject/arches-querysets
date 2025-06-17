@@ -186,8 +186,11 @@ class GraphTestCase(TestCase):
             "concept": str(cls.concept_value.pk),
             "concept-list": [str(cls.concept_value.pk)],
             "node-value": str(cls.cardinality_1_tile.pk),
-            # reference (?)
-            # randomly create geometry
+            # TODO: geojson-feature-collection
+            # TODO: file-list
+            # TODO: domain-value{-list}
+            # TODO(maybe): edtf
+            # TODO(maybe): annotation
         }
         cls.sample_data_n = {
             **cls.sample_data_1,
