@@ -9,6 +9,7 @@ from arches.app.models.models import (
     CardXNodeXWidget,
     Concept,
     DDataType,
+    Language,
     Node,
     NodeGroup,
     ResourceInstance,
@@ -33,6 +34,7 @@ class GraphTestCase(TestCase):
         cls.create_resources()
         cls.create_tiles_with_data()
         cls.create_tiles_with_none()
+        cls.simulate_pre_structure_tile_data()
         cls.create_relations()
 
     @classmethod
@@ -104,13 +106,19 @@ class GraphTestCase(TestCase):
         cls.date_node_1, cls.date_node_n = [
             node for node in cls.nodes if node.datatype == "date"
         ]
-        for node in cls.nodes:
-            if node.datatype == "node-value":
-                if node.nodegroup.cardinality == "1":
-                    node.config["nodeid"] = str(cls.date_node_1.pk)
-                else:
-                    node.config["nodeid"] = str(cls.date_node_n.pk)
-                node.save()
+        cls.string_node_1, cls.string_node_n = [
+            node for node in cls.nodes if node.datatype == "string"
+        ]
+        cls.node_value_node_1, cls.node_value_node_n = [
+            node for node in cls.nodes if node.datatype == "node-value"
+        ]
+        cls.url_node_1, cls.url_node_n = [
+            node for node in cls.nodes if node.datatype == "url"
+        ]
+        cls.node_value_node_1.config["nodeid"] = str(cls.date_node_1.pk)
+        cls.node_value_node_1.save()
+        cls.node_value_node_n.config["nodeid"] = str(cls.date_node_n.pk)
+        cls.node_value_node_n.save()
 
     @classmethod
     def create_cards(cls):
@@ -256,13 +264,33 @@ class GraphTestCase(TestCase):
         cls.cardinality_1_tile_none = TileModel.objects.create(
             nodegroup=cls.nodegroup_1,
             resourceinstance=cls.resource_none,
-            data={nodeid: None for nodeid in cls.sample_data_1},
         )
         cls.cardinality_n_tile_none = TileModel.objects.create(
             nodegroup=cls.nodegroup_n,
             resourceinstance=cls.resource_none,
-            data={nodeid: None for nodeid in cls.sample_data_n},
         )
+
+    @classmethod
+    def simulate_pre_structure_tile_data(cls):
+        # Until https://github.com/archesproject/arches/issues/12275,
+        # String and URL do not permit None as a value.
+        cls.languages = Language.objects.all()
+        default = {
+            lang.code: {"value": "", "direction": lang.default_direction}
+            for lang in cls.languages
+        }
+        cls.cardinality_1_tile_none.data[str(cls.string_node_1.pk)] = default
+        cls.cardinality_1_tile_none.data[str(cls.url_node_1.pk)] = {
+            "url": "",
+            "url_label": "",
+        }
+        cls.cardinality_1_tile_none.save()
+        cls.cardinality_n_tile_none.data[str(cls.string_node_n.pk)] = default
+        cls.cardinality_n_tile_none.data[str(cls.url_node_n.pk)] = {
+            "url": "",
+            "url_label": "",
+        }
+        cls.cardinality_n_tile_none.save()
 
     @classmethod
     def create_relations(cls):
