@@ -1,3 +1,5 @@
+import json
+
 from arches_querysets.models import SemanticResource
 from tests.utils import GraphTestCase
 
@@ -35,8 +37,10 @@ class DatatypeRepresentationTests(GraphTestCase):
             "concept-list": "Arches",
             # Node value resolves to node value.
             "node-value": self.sample_data_1["date"],
-            # URL resolves to label.
-            "url": self.sample_data_1["url"]["url_label"],
+            # URL resolves to the stringified dictionary.
+            "url": json.dumps(self.sample_data_1["url"]),
+            # File-list resolves to urls joined with " | ".
+            "file-list": self.sample_data_1["file-list"][0]["url"],
         }
 
         # The representation is available on the nodegroup .aliased_data.
