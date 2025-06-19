@@ -1,4 +1,5 @@
 import datetime
+import uuid
 
 from django.test import TestCase
 
@@ -186,8 +187,42 @@ class GraphTestCase(TestCase):
             "concept": str(cls.concept_value.pk),
             "concept-list": [str(cls.concept_value.pk)],
             "node-value": str(cls.cardinality_1_tile.pk),
+            "file-list": [
+                {
+                    "url": "http://www.archesproject.org/blog/static/42.png",
+                    "name": "42_accessibility_improvements.png",
+                    "size": 2042,
+                    "type": "image/png",
+                    "index": 0,
+                    "title": {
+                        "en": {
+                            "value": "42 Accessibility Improvements",
+                            "direction": "ltr",
+                        }
+                    },
+                    "width": 2042,
+                    "height": 2042,
+                    "status": "added",
+                    "altText": {
+                        "en": {
+                            "value": "Illustration of recent accessibility improvements",
+                            "direction": "ltr",
+                        }
+                    },
+                    "content": f"blob:http://localhost:8000/{uuid.uuid4()}",
+                    "file_id": str(uuid.uuid4()),
+                    "accepted": True,
+                    "attribution": {"en": {"value": "Arches", "direction": "ltr"}},
+                    "description": {
+                        "en": {
+                            "value": "Recent versions of arches have 42 improved accessibility characteristics.",
+                            "direction": "ltr",
+                        }
+                    },
+                    "lastModified": 1723503486969,
+                }
+            ],
             # TODO: geojson-feature-collection
-            # TODO: file-list
             # TODO: domain-value{-list}
             # TODO(maybe): edtf
             # TODO(maybe): annotation
