@@ -327,6 +327,9 @@ class BulkTileOperation:
             # validate() will handle.
             transformed = value_to_validate
 
+        # Merge the incoming value.
+        tile.data[node_id_str] = transformed
+
         datatype_instance.pre_structure_tile_data(
             tile, node_id_str, languages=self.languages
         )
