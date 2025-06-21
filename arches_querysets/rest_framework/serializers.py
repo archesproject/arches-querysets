@@ -1,4 +1,3 @@
-from copy import deepcopy
 from functools import lru_cache, partial
 
 from django.conf import settings
@@ -15,17 +14,21 @@ from arches.app.models.fields.i18n import I18n_JSON, I18n_String
 from arches.app.models.models import Node
 from arches.app.utils.betterJSONSerializer import JSONSerializer
 
+from arches_querysets.datatypes.datatypes import DataTypeFactory
 from arches_querysets.models import AliasedData, SemanticResource, SemanticTile
-
-
-# Workaround for I18n_string fields
-renderers.JSONRenderer.encoder_class = JSONSerializer
-renderers.JSONOpenAPIRenderer.encoder_class = JSONSerializer
+from arches_querysets.rest_framework import interchange_mixin
 
 
 def _make_tile_serializer(
     *, nodegroup_alias, cardinality, sortorder, slug, graph_nodes, nodes="__all__"
-):
+) -> type:
+    """
+    DRF encourages a declarative programming style with classes. You, as
+    the project implementer, can follow that style if you wish, but we've
+    put some effort toward hiding this complexity from you by generating
+    classes on the fly by default.
+    """
+
     class DynamicTileSerializer(ArchesTileSerializer):
         aliased_data = TileAliasedDataSerializer(
             required=False,
@@ -42,15 +45,27 @@ def _make_tile_serializer(
             fields = nodes
 
     name = "_".join((slug.title(), nodegroup_alias.title(), "TileSerializer"))
-    klass = type(name, (DynamicTileSerializer,), {})
-    ret = klass(
+    serializer_class = type(name, (DynamicTileSerializer,), {})
+    return serializer_class(
         many=cardinality == "n",
         required=False,
         allow_null=True,
         graph_nodes=graph_nodes,
         style={"alias": nodegroup_alias, "sortorder": sortorder},
     )
-    return ret
+
+
+def _wrap_serializer_field(serializer_field_class) -> type:
+    """
+    Ensure every serializer field in DRF's serializer_field_mapping
+    resolves to one of *our* serializer fields with overrides handling
+    interchange_value wrapping and unwrapping.
+    """
+    return type(
+        serializer_field_class.__name__,
+        (interchange_mixin.InterchangeValueMixin, serializer_field_class),
+        {},
+    )
 
 
 class NodeFetcherMixin:
@@ -181,7 +196,8 @@ class ResourceAliasedDataSerializer(serializers.Serializer, NodeFetcherMixin):
         return field_names
 
     def to_internal_value(self, data):
-        return AliasedData(**data)
+        attrs = super().to_internal_value(data)
+        return AliasedData(**attrs)
 
     def validate(self, attrs):
         if hasattr(self, "initial_data") and (
@@ -192,26 +208,9 @@ class ResourceAliasedDataSerializer(serializers.Serializer, NodeFetcherMixin):
 
 
 class TileAliasedDataSerializer(serializers.ModelSerializer, NodeFetcherMixin):
-    datatype_field_map = {
-        "string": models.JSONField(null=True),
-        "number": models.FloatField(null=True),
-        "concept": models.JSONField(null=True),
-        "concept-list": models.JSONField(null=True),
-        "date": models.DateField(null=True),
-        "node-value": models.CharField(null=True),  # XXX
-        "edtf": models.CharField(null=True),  # XXX
-        "annotation": models.CharField(null=True),  # XXX
-        "url": models.JSONField(null=True),  # XXX
-        "resource-instance": models.JSONField(null=True),
-        "resource-instance-list": models.JSONField(null=True),
-        "boolean": models.BooleanField(null=True),
-        "domain-value": models.JSONField(null=True),
-        "domain-value-list": models.JSONField(null=True),
-        "non-localized-string": models.CharField(null=True),
-        "geojson-feature-collection": models.CharField(null=True),  # XXX
-        "file-list": models.JSONField(null=True),
-        # TODO: reference datatype should supply this itself somehow.
-        "reference": models.JSONField(null=True),
+    serializer_field_mapping = {
+        model_field: _wrap_serializer_field(serializer_field)
+        for model_field, serializer_field in serializers.ModelSerializer.serializer_field_mapping.items()
     }
 
     class Meta:
@@ -316,22 +315,20 @@ class TileAliasedDataSerializer(serializers.ModelSerializer, NodeFetcherMixin):
                 f"Node with alias {field_name} not found in graph {self.graph_slug}"
             )
 
-        model_field = deepcopy(self.datatype_field_map[node.datatype])
-        if model_field is None:
-            if node.nodegroup.grouping_node == node:
-                sortorder = 0
-                if node.nodegroup.cardmodel_set.all():
-                    sortorder = node.nodegroup.cardmodel_set.all()[0].sortorder
-                model_field = _make_tile_serializer(
-                    slug=self.graph_slug,
-                    nodegroup_alias=node.alias,
-                    cardinality=node.nodegroup.cardinality,
-                    graph_nodes=self.graph_nodes,
-                    sortorder=sortorder,
-                )
-            else:
-                msg = _("Field missing for datatype: {}").format(node.datatype)
-                raise NotImplementedError(msg)
+        if node.datatype == "semantic" and node.nodegroup.grouping_node == node:
+            sortorder = 0
+            if node.nodegroup.cardmodel_set.all():
+                sortorder = node.nodegroup.cardmodel_set.all()[0].sortorder
+            model_field = _make_tile_serializer(
+                slug=self.graph_slug,
+                nodegroup_alias=node.alias,
+                cardinality=node.nodegroup.cardinality,
+                graph_nodes=self.graph_nodes,
+                sortorder=sortorder,
+            )
+        else:
+            dt_instance = DataTypeFactory().get_instance(node.datatype)
+            model_field = DataTypeFactory.get_model_field(dt_instance)
         model_field.model = model_class
         model_field.blank = not node.isrequired
         try:
@@ -353,7 +350,7 @@ class TileAliasedDataSerializer(serializers.ModelSerializer, NodeFetcherMixin):
         except KeyError:
             pass
         try:
-            ret[1]["help_text"] = config.serialize().get("placeholder", None)
+            ret[1]["help_text"] = config.serialize().get("placeholder")
         except KeyError:
             pass
         ret[1]["label"] = label.serialize()
@@ -509,12 +506,17 @@ class ArchesResourceSerializer(serializers.ModelSerializer, NodeFetcherMixin):
             instance_from_factory = options.model.as_model(
                 graph_slug=self.graph_slug,
                 only=None,
+                as_representation=True,
                 user=self.context["request"].user,
             ).get(pk=instance_without_tile_data.pk)
-            instance_from_factory._as_representation = True
             # TODO: decide whether to override update() instead of using partial().
             instance_from_factory.save = partial(
                 instance_from_factory.save, request=self.context["request"]
             )
             updated = self.update(instance_from_factory, validated_data)
         return updated
+
+
+# Workaround for I18n_string fields
+renderers.JSONRenderer.encoder_class = JSONSerializer
+renderers.JSONOpenAPIRenderer.encoder_class = JSONSerializer

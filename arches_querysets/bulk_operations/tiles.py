@@ -1,6 +1,5 @@
 import uuid
 from collections import defaultdict
-from functools import partial
 from operator import attrgetter
 
 from django.core.exceptions import ValidationError
@@ -9,11 +8,10 @@ from django.http import HttpRequest
 from django.utils.translation import gettext as _
 
 from arches import VERSION as arches_version
-from arches.app.datatypes.datatypes import DataTypeFactory
 from arches.app.models.models import Language, Node, TileModel, ResourceInstance
 from arches.app.models.tile import Tile, TileValidationError
 
-from arches_querysets.utils import datatype_transforms
+from arches_querysets.datatypes.datatypes import DataTypeFactory
 from arches_querysets.utils.models import (
     field_attnames,
     get_nodegroups_here_and_below,
@@ -24,7 +22,7 @@ from arches_querysets.utils.models import (
 NOT_PROVIDED = object()
 
 
-class BulkTileOperation:
+class SemanticTileOperation:
     def __init__(self, *, entry, request=None, save_kwargs=None):
         self.to_insert = set()
         self.to_update = set()
@@ -32,6 +30,7 @@ class BulkTileOperation:
         self.errors_by_node_alias = defaultdict(list)
         self.entry = entry  # resource or tile
         self.datatype_factory = DataTypeFactory()
+        self.languages = Language.objects.all()
         self.request = request
         if not self.request:
             self.request = HttpRequest()
@@ -83,10 +82,10 @@ class BulkTileOperation:
 
         return lookup
 
-    def run(self):
+    def validate_and_save_tiles(self):
         self.validate()
         try:
-            self._persist()
+            self._save()
         except ProgrammingError as e:
             if e.args and "excess_tiles" in e.args[0]:
                 nodegroup_id = e.args[0].split("nodegroupid: ")[1].split(",")[0]
@@ -99,15 +98,12 @@ class BulkTileOperation:
         self.after_update_all()
 
     def validate(self):
-        self._update_tiles()
-
-    def _update_tiles(self):
         """Move values from resource or tile to prefetched tiles, and validate.
         Raises ValidationError if new data fails datatype validation.
         """
         original_tile_data_by_tile_id = {}
         if isinstance(self.entry, TileModel):
-            self._update_tile_for_grouping_node(
+            self._update_tile(
                 self.entry.nodegroup.grouping_node,
                 self.entry,
                 original_tile_data_by_tile_id,
@@ -116,7 +112,7 @@ class BulkTileOperation:
             for grouping_node in self.grouping_nodes_by_nodegroup_id.values():
                 if grouping_node.nodegroup.parentnodegroup_id:
                     continue
-                self._update_tile_for_grouping_node(
+                self._update_tile(
                     grouping_node,
                     self.entry,
                     original_tile_data_by_tile_id,
@@ -131,7 +127,7 @@ class BulkTileOperation:
                 }
             )
 
-    def _update_tile_for_grouping_node(
+    def _update_tile(
         self,
         grouping_node,
         container,
@@ -198,7 +194,6 @@ class BulkTileOperation:
                 self.to_update.add(existing_tile)
 
         nodes = grouping_node.nodegroup.node_set.all()
-        languages = Language.objects.all()
         for tile in self.to_insert | self.to_update:
             if tile.nodegroup_id != grouping_node.pk:
                 # TODO: this is a symptom this should be refactored.
@@ -216,17 +211,13 @@ class BulkTileOperation:
                     )
                     child_nodegroup.grouping_node = grouping_node
             for child_nodegroup in children:
-                self._update_tile_for_grouping_node(
+                self._update_tile(
                     grouping_node=child_nodegroup.grouping_node,
                     container=tile._incoming_tile,
                     original_tile_data_by_tile_id=original_tile_data_by_tile_id,
                     delete_siblings=True,
                 )
-            self._validate_and_patch_from_tile_values(
-                tile,
-                nodes=nodes,
-                languages=languages,
-            )
+            self._validate_and_patch_incoming_values(tile, nodes=nodes)
 
         # https://github.com/archesproject/arches-querysets/issues/11
         # for tile in self.to_insert | self.to_update:
@@ -279,7 +270,7 @@ class BulkTileOperation:
                 pairs.append((NOT_PROVIDED, new_tile))
         return pairs
 
-    def _validate_and_patch_from_tile_values(self, tile, *, nodes, languages):
+    def _validate_and_patch_incoming_values(self, tile, *, nodes):
         """Validate data found on ._incoming_tile and move it to .data.
         Update errors_by_node_alias in place."""
         from arches_querysets.models import AliasedData, SemanticTile
@@ -297,54 +288,56 @@ class BulkTileOperation:
                 )
             if value_to_validate is NOT_PROVIDED:
                 continue
-            self._run_datatype_methods(tile, value_to_validate, node, languages)
+            if isinstance(value_to_validate, dict):
+                interchange_val = value_to_validate.get(
+                    "interchange_value", NOT_PROVIDED
+                )
+                if interchange_val is not NOT_PROVIDED:
+                    value_to_validate = interchange_val
 
-    def _run_datatype_methods(self, tile, value_to_validate, node, languages):
+            self._run_datatype_methods(tile, value_to_validate, node)
+
+    def _run_datatype_methods(self, tile, value_to_validate, node):
         """
         Call datatype methods when merging value_to_validate into the tile.
 
         1. transform_value_for_tile()
-        2. merge_tile_value() -- only exists in arches-querysets for now
+        2. pre_structure_tile_data()
         3. clean()
         4. validate()
         5. pre_tile_save()
 
-        TODO: pre_structure_tile_data()?
-        TODO: move this to Tile.full_clean()?
+        TODO: move this to BaseDataType.full_clean()?
         https://github.com/archesproject/arches/issues/10851#issuecomment-2427305853
         """
         node_id_str = str(node.pk)
         datatype_instance = self.datatype_factory.get_instance(node.datatype)
 
-        transform_fn, merge_fn, clean_fn, validate_fn, pre_tile_save_fn = (
-            self._get_overridden_datatype_methods(datatype_instance)
-        )
-
         if value_to_validate is None:
             tile.data[node_id_str] = None
             return
         try:
-            transformed = transform_fn(
-                value_to_validate, languages=languages, **node.config
+            transformed = datatype_instance.transform_value_for_tile(
+                value_to_validate, languages=self.languages, **node.config
             )
         except ValueError:  # BooleanDataType raises.
             # validate() will handle.
             transformed = value_to_validate
 
-        # Merge the transformed data into the tile.data.
-        # We just overwrite the old value unless a datatype has another idea.
-        if merge_fn:
-            merge_fn(tile, node_id_str, transformed)
-        else:
-            tile.data[node_id_str] = transformed
+        # Merge the incoming value.
+        tile.data[node_id_str] = transformed
 
-        clean_fn(tile, node_id_str)
+        datatype_instance.pre_structure_tile_data(
+            tile, node_id_str, languages=self.languages
+        )
 
-        if errors := validate_fn(transformed, node=node):
+        datatype_instance.clean(tile, node_id_str)
+
+        if errors := datatype_instance.validate(transformed, node=node):
             self.errors_by_node_alias[node.alias].extend(errors)
 
         try:
-            pre_tile_save_fn(tile, node_id_str)
+            datatype_instance.pre_tile_save(tile, node_id_str)
         except TypeError:  # GeoJSONDataType raises.
             self.errors_by_node_alias[node.alias].append(
                 datatype_instance.create_error_message(
@@ -352,46 +345,7 @@ class BulkTileOperation:
                 )
             )
 
-    def _get_overridden_datatype_methods(self, datatype_instance):
-        """
-        Get datatype methods, possibly overridden by more robust ones
-        from arches_querysets.datatype_transforms.
-        """
-        assert datatype_instance.datatype_name
-        snake_dt = datatype_instance.datatype_name.replace("-", "_")
-
-        if transform_fn := getattr(
-            datatype_transforms,
-            f"{snake_dt}_transform_value_for_tile",
-            None,
-        ):
-            transform_fn = partial(transform_fn, datatype_instance)
-        else:
-            transform_fn = datatype_instance.transform_value_for_tile
-        if merge_fn := getattr(
-            datatype_transforms,
-            f"{snake_dt}_merge_tile_value",
-            None,
-        ):
-            merge_fn = partial(merge_fn, datatype_instance)
-        if clean_fn := getattr(datatype_transforms, f"{snake_dt}_clean", None):
-            clean_fn = partial(clean_fn, datatype_instance)
-        else:
-            clean_fn = datatype_instance.clean
-        if validate_fn := getattr(datatype_transforms, f"{snake_dt}_validate", None):
-            validate_fn = partial(validate_fn, datatype_instance)
-        else:
-            validate_fn = datatype_instance.validate
-        if pre_tile_save_fn := getattr(
-            datatype_transforms, f"{snake_dt}_pre_tile_save", None
-        ):
-            pre_tile_save_fn = partial(pre_tile_save_fn, datatype_instance)
-        else:
-            pre_tile_save_fn = datatype_instance.pre_tile_save
-
-        return transform_fn, merge_fn, clean_fn, validate_fn, pre_tile_save_fn
-
-    def _persist(self):
+    def _save(self):
         # Instantiate proxy models for now, but TODO: expose this
         # functionality on vanilla models, and in bulk.
         upserts = self.to_insert | self.to_update
