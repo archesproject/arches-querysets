@@ -148,10 +148,10 @@ class SemanticResource(ResourceInstance):
             - the node values are phantom fields.
             - we have other entry points besides DRF.
         """
-        bulk_operation = SemanticTileOperation(
+        operation = SemanticTileOperation(
             entry=self, request=request, save_kwargs=kwargs
         )
-        bulk_operation.validate_and_save_tiles()
+        operation.validate_and_save_tiles()
 
         # Instantiate proxy model for now, but refactor & expose this on vanilla model
         proxy_resource = Resource.objects.get(pk=self.pk)
@@ -160,9 +160,7 @@ class SemanticResource(ResourceInstance):
             proxy_resource.index()
 
         if request:
-            self.save_edit(
-                user=request.user, transaction_id=bulk_operation.transaction_id
-            )
+            self.save_edit(user=request.user, transaction_id=operation.transaction_id)
 
         self.refresh_from_db(
             using=kwargs.get("using"),
@@ -425,10 +423,10 @@ class SemanticTile(TileModel):
         return super().save(**save_kwargs)
 
     def _save_aliased_data(self, *, request=None, index=True, **kwargs):
-        bulk_operation = SemanticTileOperation(
+        operation = SemanticTileOperation(
             entry=self, request=request, save_kwargs=kwargs
         )
-        bulk_operation.validate_and_save_tiles()
+        operation.validate_and_save_tiles()
 
         proxy_resource = Resource.objects.get(pk=self.resourceinstance_id)
         proxy_resource.save_descriptors()
