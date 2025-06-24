@@ -1,6 +1,6 @@
 from arches.app.models.models import Node, TileModel
 from arches.app.utils.betterJSONSerializer import JSONDeserializer, JSONSerializer
-from arches_querysets.models import SemanticResource
+from arches_querysets.models import ResourceTileTree
 from tests.utils import GraphTestCase
 
 
@@ -58,7 +58,7 @@ class SerializationTests(GraphTestCase):
         }
         cls.cardinality_n_child_tile.save()
 
-        cls.resource = SemanticResource.as_model(
+        cls.resource = ResourceTileTree.as_model(
             "datatype_lookups", as_representation=True
         ).get(pk=cls.resource_42.pk)
 
