@@ -1,3 +1,5 @@
+import uuid
+
 from arches.app.models.models import Node, TileModel
 from arches.app.utils.betterJSONSerializer import JSONDeserializer, JSONSerializer
 from arches_querysets.models import ResourceTileTree
@@ -31,7 +33,7 @@ class SerializationTests(GraphTestCase):
 
         # Clone nodes.
         for node in cls.nodes:
-            node.pk = None
+            node.pk = uuid.uuid4()
             node.name = node.name + "-child"
             node.alias = node.alias + "_child"
             node.nodegroup = (
