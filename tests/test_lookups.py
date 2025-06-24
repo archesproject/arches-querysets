@@ -1,10 +1,10 @@
-from arches_querysets.models import SemanticResource
+from arches_querysets.models import ResourceTileTree
 from tests.utils import GraphTestCase
 
 
 class LookupTests(GraphTestCase):
     def test_cardinality_1_lookups(self):
-        resources = SemanticResource.as_model("datatype_lookups")
+        resources = ResourceTileTree.as_model("datatype_lookups")
 
         # Exact
         for lookup, value in [
@@ -26,7 +26,7 @@ class LookupTests(GraphTestCase):
                 self.assertTrue(resources.filter(**{lookup: value}))
 
     def test_cardinality_n_lookups(self):
-        resources = SemanticResource.as_model("datatype_lookups")
+        resources = ResourceTileTree.as_model("datatype_lookups")
 
         # Exact
         for lookup, value in [
@@ -43,7 +43,7 @@ class LookupTests(GraphTestCase):
                 self.assertTrue(resources.filter(**{lookup: value}))
 
     def test_localized_string_lookups(self):
-        resources = SemanticResource.as_model("datatype_lookups")
+        resources = ResourceTileTree.as_model("datatype_lookups")
 
         for lookup, value in [
             ("string__any_lang_startswith", "forty"),
@@ -65,7 +65,7 @@ class LookupTests(GraphTestCase):
                 self.assertFalse(resources.filter(**{lookup: value}))
 
     def test_localized_string_lookups_n(self):
-        resources = SemanticResource.as_model("datatype_lookups")
+        resources = ResourceTileTree.as_model("datatype_lookups")
 
         for lookup, value in [
             ("string_n__any_lang_startswith", "forty"),
@@ -87,7 +87,7 @@ class LookupTests(GraphTestCase):
                 self.assertFalse(resources.filter(**{lookup: value}))
 
     def test_resource_instance_lookups(self):
-        resources = SemanticResource.as_model("datatype_lookups")
+        resources = ResourceTileTree.as_model("datatype_lookups")
 
         for lookup, value in [
             ("resource_instance__id", str(self.resource_42.pk)),
@@ -97,7 +97,7 @@ class LookupTests(GraphTestCase):
                 self.assertTrue(resources.filter(**{lookup: value}))
 
     def test_resource_instance_lookups_n(self):
-        resources = SemanticResource.as_model("datatype_lookups")
+        resources = ResourceTileTree.as_model("datatype_lookups")
 
         for lookup, value in [
             ("resource_instance_n__ids_contain", str(self.resource_42.pk)),

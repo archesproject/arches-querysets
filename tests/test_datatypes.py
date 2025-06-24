@@ -1,6 +1,6 @@
 import json
 
-from arches_querysets.models import SemanticResource
+from arches_querysets.models import ResourceTileTree
 from tests.utils import GraphTestCase
 
 
@@ -8,7 +8,7 @@ class DatatypeRepresentationTests(GraphTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        resources = SemanticResource.as_model(
+        resources = ResourceTileTree.as_model(
             "datatype_lookups", as_representation=True
         )
         cls.semantic_resource_42 = resources.get(pk=cls.resource_42.pk)
@@ -120,7 +120,7 @@ class DatatypePythonTests(GraphTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        resources = SemanticResource.as_model(
+        resources = ResourceTileTree.as_model(
             "datatype_lookups", as_representation=False
         )
         cls.semantic_resource = resources.get(pk=cls.resource_42.pk)
