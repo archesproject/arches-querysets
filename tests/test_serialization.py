@@ -60,7 +60,7 @@ class SerializationTests(GraphTestCase):
         }
         cls.cardinality_n_child_tile.save()
 
-        cls.resource = ResourceTileTree.as_model(
+        cls.resource = ResourceTileTree.get_tiles(
             "datatype_lookups", as_representation=True
         ).get(pk=cls.resource_42.pk)
 
