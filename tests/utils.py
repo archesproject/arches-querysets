@@ -44,29 +44,26 @@ class GraphTestCase(TestCase):
         )
 
     @classmethod
-    def create_nodegroups_and_grouping_nodes(cls):
-        cls.grouping_node_1 = Node(
-            graph=cls.graph, alias="datatypes_1", istopnode=False, datatype="semantic"
+    def create_nodegroup(cls, alias, cardinality, parent_nodegroup=None):
+        grouping_node = Node(
+            graph=cls.graph, alias=alias, istopnode=False, datatype="semantic"
         )
-        cls.nodegroup_1 = NodeGroup.objects.create(pk=cls.grouping_node_1.pk)
+        nodegroup = NodeGroup.objects.create(
+            pk=grouping_node.pk,
+            cardinality=cardinality,
+            parentnodegroup=parent_nodegroup,
+        )
         if arches_version >= (8, 0):
-            cls.nodegroup_1.grouping_node = cls.grouping_node_1
-            cls.nodegroup_1.save()
-        cls.grouping_node_1.nodegroup = cls.nodegroup_1
-        cls.grouping_node_1.save()
+            nodegroup.grouping_node = grouping_node
+            nodegroup.save()
+        grouping_node.nodegroup = nodegroup
+        grouping_node.save()
+        return nodegroup, grouping_node
 
-        cls.grouping_node_n = Node(
-            graph=cls.graph, alias="datatypes_n", istopnode=False, datatype="semantic"
-        )
-        cls.nodegroup_n = NodeGroup.objects.create(
-            pk=cls.grouping_node_n.pk,
-            cardinality="n",
-        )
-        if arches_version >= (8, 0):
-            cls.nodegroup_n.grouping_node = cls.grouping_node_n
-            cls.nodegroup_n.save()
-        cls.grouping_node_n.nodegroup = cls.nodegroup_n
-        cls.grouping_node_n.save()
+    @classmethod
+    def create_nodegroups_and_grouping_nodes(cls):
+        cls.nodegroup_1, cls.grouping_node_1 = cls.create_nodegroup("datatypes_1", "1")
+        cls.nodegroup_n, cls.grouping_node_n = cls.create_nodegroup("datatypes_n", "n")
 
     @classmethod
     def create_data_collecting_nodes(cls):
@@ -148,10 +145,12 @@ class GraphTestCase(TestCase):
         cls.resource_42 = ResourceInstance.objects.create(
             graph=cls.graph,
             descriptors={"en": {"name": "Resource referencing 42"}},
+            name="Resource referencing 42",
         )
         cls.resource_none = ResourceInstance.objects.create(
             graph=cls.graph,
             descriptors={"en": {"name": "Resource referencing None"}},
+            name="Resource referencing None",
         )
 
     @classmethod
