@@ -23,7 +23,7 @@ class DatatypeRepresentationTests(GraphTestCase, AssertNoneishMixin):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        resources = ResourceTileTree.as_model(
+        resources = ResourceTileTree.get_tiles(
             "datatype_lookups", as_representation=True
         )
         cls.semantic_resource_42 = resources.get(pk=cls.resource_42.pk)
@@ -135,7 +135,7 @@ class DatatypePythonTests(GraphTestCase, AssertNoneishMixin):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        resources = ResourceTileTree.as_model(
+        resources = ResourceTileTree.get_tiles(
             "datatype_lookups", as_representation=False
         )
         cls.semantic_resource = resources.get(pk=cls.resource_42.pk)

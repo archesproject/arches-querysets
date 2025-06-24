@@ -263,10 +263,12 @@ class GraphTestCase(TestCase):
         cls.cardinality_1_tile_none = TileModel.objects.create(
             nodegroup=cls.nodegroup_1,
             resourceinstance=cls.resource_none,
+            data={},
         )
         cls.cardinality_n_tile_none = TileModel.objects.create(
             nodegroup=cls.nodegroup_n,
             resourceinstance=cls.resource_none,
+            data={},
         )
 
     @classmethod
