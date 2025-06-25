@@ -1,3 +1,4 @@
+from arches_querysets.datatypes import DataTypeFactory
 from arches_querysets.models import GraphWithPrefetching, ResourceTileTree
 from tests.utils import GraphTestCase
 
@@ -16,6 +17,13 @@ class PerformanceTests(GraphTestCase):
             GraphWithPrefetching.prefetch("datatype_lookups")
 
     def test_get_resources(self):
+        # Clear the value lookups to avoid flakiness.
+        factory = DataTypeFactory()
+        concept_dt = factory.get_instance("concept")
+        concept_dt.value_lookup = {}
+        concept_list_dt = factory.get_instance("concept-list")
+        concept_list_dt.value_lookup = {}
+
         # 1-8: test_get_graph_objects()
         # 9: resource
         # 10: tile depth 1
