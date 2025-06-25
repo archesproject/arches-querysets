@@ -11,23 +11,21 @@ class PerformanceTests(GraphTestCase):
         # 5: graph -> node -> nodegroup -> node
         # 6: graph -> node -> nodegroup -> node -> cardxnodexwidget
         # 7: graph -> node -> nodegroup -> card
-        # 8: graph -> node -> nodegroup -> child nodegroup
-        # 9: graph -> node -> nodegroup -> child nodegroup -> nodes
-        # 10: graph -> node -> nodegroup -> child nodegroup -> child_nodegroup (none!)
-        with self.assertNumQueries(10):
+        # 8: graph -> node -> nodegroup -> child nodegroup -> child_nodegroup (none!)
+        with self.assertNumQueries(8):
             GraphWithPrefetching.prefetch("datatype_lookups")
 
     def test_get_resources(self):
-        # 1-10: test_get_graph_objects()
-        # 11: resource
-        # 12: tile depth 1
-        # 13: tile -> nodegroup
-        # 14: tile -> tile depth 2
-        # 15: tile -> resource
-        # (15 is a little unfortunate, but worth it for resourcexresource prefetches.)
-        # 16: tile -> resource -> resourcexresource
-        # 17: related resources
-        # 18: concept value
-        # 19: (N+1 BUG: core arches) another concept value
-        with self.assertNumQueries(19):
+        # 1-8: test_get_graph_objects()
+        # 9: resource
+        # 10: tile depth 1
+        # 11: tile -> nodegroup
+        # 12: tile -> tile depth 2
+        # 13: tile -> resource
+        # (13 is a little unfortunate, but worth it for resourcexresource prefetches.)
+        # 14: tile -> resource -> resourcexresource
+        # 15: related resources
+        # 16: concept value
+        # 17: (N+1 BUG: core arches) another concept value
+        with self.assertNumQueries(17):
             self.assertEqual(len(ResourceTileTree.get_tiles("datatype_lookups")), 2)
