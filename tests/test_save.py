@@ -18,9 +18,6 @@ class SaveTileTests(GraphTestCase):
         cls.datatype_n_none = cls.semantic_resource_none.aliased_data.datatypes_n
 
     def test_blank_tile_save_with_defaults(self):
-        # Saving a blank tile should populate default values if defaults are defined
-        self.add_default_values_for_widgets()
-
         # Existing tiles with `None`'s should not be updated with defaults during save
         self.semantic_resource_none.save()
         for (
@@ -34,7 +31,8 @@ class SaveTileTests(GraphTestCase):
         self.semantic_resource_42.aliased_data.datatypes_1.delete()
         self.semantic_resource_42.refresh_from_db()
         self.semantic_resource_42.fill_blanks()
-        self.semantic_resource_42.save()
+        # Saving a blank tile should populate default values if defaults are defined.
+        self.semantic_resource_42.save(index=False)
         for (
             nodeid,
             value,
@@ -51,7 +49,7 @@ class SaveTileTests(GraphTestCase):
         for node in self.semantic_resource_42.aliased_data.datatypes_1.data:
             self.semantic_resource_42.aliased_data.datatypes_1.data[node] = None
         # Save should stock defaults
-        self.semantic_resource_42.aliased_data.datatypes_1.save()
+        self.semantic_resource_42.aliased_data.datatypes_1.save(index=False)
 
         for (
             nodeid,

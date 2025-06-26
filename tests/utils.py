@@ -31,11 +31,12 @@ class GraphTestCase(TestCase):
         # cls.create_edges() -- edges not fathomed
         cls.create_cards()
         cls.create_widgets()
+        cls.add_default_values_for_widgets()
         cls.create_resources()
         cls.create_tiles_with_data()
         cls.create_tiles_with_none()
         cls.create_relations()
-        Graph.objects.get(pk=cls.graph.pk).publish()
+        Graph.objects.get(pk=cls.graph.pk).publish(user=None)
 
     @classmethod
     def create_graph(cls):
@@ -142,12 +143,12 @@ class GraphTestCase(TestCase):
 
     @classmethod
     def add_default_values_for_widgets(cls):
-        # Optional method to add default values for widgets
         node_widgets = CardXNodeXWidget.objects.filter(
             node__graph=cls.graph,
         )
         cls.default_vals_by_nodeid = {}
         cls.default_vals_by_datatype = {
+            "non-localized-string": "The answer to life, the universe, and everything.",
             "string": {
                 "en": {
                     "value": "The answer to life, the universe, and everything.",
@@ -173,7 +174,10 @@ class GraphTestCase(TestCase):
                 )
             else:
                 cls.default_vals_by_nodeid[str(widget.node.pk)] = None
-        CardXNodeXWidget.objects.bulk_update(node_widgets, ["config"])
+            if arches_version < (8, 0):
+                widget.save()
+        if arches_version >= (8, 0):
+            CardXNodeXWidget.objects.bulk_update(node_widgets, ["config"])
 
     @classmethod
     def create_resources(cls):
@@ -298,10 +302,12 @@ class GraphTestCase(TestCase):
         cls.cardinality_1_tile_none = TileModel.objects.create(
             nodegroup=cls.nodegroup_1,
             resourceinstance=cls.resource_none,
+            data={},
         )
         cls.cardinality_n_tile_none = TileModel.objects.create(
             nodegroup=cls.nodegroup_n,
             resourceinstance=cls.resource_none,
+            data={},
         )
 
     @classmethod
