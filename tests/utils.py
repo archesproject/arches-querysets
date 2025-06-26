@@ -139,6 +139,41 @@ class GraphTestCase(TestCase):
         CardXNodeXWidget.objects.bulk_create(node_widgets)
 
     @classmethod
+    def add_default_values_for_widgets(cls):
+        # Optional method to add default values for widgets
+        node_widgets = CardXNodeXWidget.objects.filter(
+            node__graph=cls.graph,
+        )
+        cls.default_vals_by_nodeid = {}
+        cls.default_vals_by_datatype = {
+            "string": {
+                "en": {
+                    "value": "The answer to life, the universe, and everything.",
+                    "direction": "ltr",
+                }
+            },
+            "url": {"url": "http://arthurdent.com", "url_label": ""},
+            "boolean": False,
+            "number": 42,
+            "date": "1979-10-12",
+            # "resource-instance": None,
+            # "resource-instance-list": [],
+            # "concept": None,
+            # "concept-list": [],
+        }
+        for widget in node_widgets:
+            if widget.node.datatype in cls.default_vals_by_datatype:
+                widget.config["defaultValue"] = cls.default_vals_by_datatype[
+                    widget.node.datatype
+                ]
+                cls.default_vals_by_nodeid[str(widget.node.pk)] = (
+                    cls.default_vals_by_datatype[widget.node.datatype]
+                )
+            else:
+                cls.default_vals_by_nodeid[str(widget.node.pk)] = None
+        CardXNodeXWidget.objects.bulk_update(node_widgets, ["config"])
+
+    @classmethod
     def create_resources(cls):
         cls.resource_42 = ResourceInstance.objects.create(
             graph=cls.graph,
