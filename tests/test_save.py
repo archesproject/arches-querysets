@@ -1,4 +1,3 @@
-import uuid
 from arches_querysets.models import SemanticResource
 from tests.utils import GraphTestCase
 
@@ -35,7 +34,6 @@ class SaveTileTests(GraphTestCase):
         self.semantic_resource_42.aliased_data.datatypes_1.delete()
         self.semantic_resource_42.refresh_from_db()
         self.semantic_resource_42.fill_blanks()
-        # self.semantic_resource_42.aliased_data.datatypes_1.tileid = uuid.uuid4()
         self.semantic_resource_42.save()
         for (
             nodeid,
