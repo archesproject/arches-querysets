@@ -9,7 +9,6 @@ from arches.app.models.models import (
     CardXNodeXWidget,
     Concept,
     DDataType,
-    Language,
     Node,
     NodeGroup,
     ResourceInstance,
@@ -34,7 +33,6 @@ class GraphTestCase(TestCase):
         cls.create_resources()
         cls.create_tiles_with_data()
         cls.create_tiles_with_none()
-        cls.simulate_pre_structure_tile_data()
         cls.create_relations()
 
     @classmethod
@@ -268,28 +266,6 @@ class GraphTestCase(TestCase):
             nodegroup=cls.nodegroup_n,
             resourceinstance=cls.resource_none,
         )
-
-    @classmethod
-    def simulate_pre_structure_tile_data(cls):
-        # Until https://github.com/archesproject/arches/issues/12275,
-        # String and URL do not permit None as a value.
-        cls.languages = Language.objects.all()
-        default = {
-            lang.code: {"value": "", "direction": lang.default_direction}
-            for lang in cls.languages
-        }
-        cls.cardinality_1_tile_none.data[str(cls.string_node_1.pk)] = default
-        cls.cardinality_1_tile_none.data[str(cls.url_node_1.pk)] = {
-            "url": "",
-            "url_label": "",
-        }
-        cls.cardinality_1_tile_none.save()
-        cls.cardinality_n_tile_none.data[str(cls.string_node_n.pk)] = default
-        cls.cardinality_n_tile_none.data[str(cls.url_node_n.pk)] = {
-            "url": "",
-            "url_label": "",
-        }
-        cls.cardinality_n_tile_none.save()
 
     @classmethod
     def create_relations(cls):

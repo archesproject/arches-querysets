@@ -4,22 +4,7 @@ from arches_querysets.models import SemanticResource
 from tests.utils import GraphTestCase
 
 
-class AssertNoneishMixin:
-    """Some datatypes don't allow None as a valid value, at least until
-    https://github.com/archesproject/arches/issues/12275.
-    """
-
-    def assertNoneish(self, value, datatype_name):
-        if datatype_name == "string":
-            expected = {"en": {"value": "", "direction": "ltr"}}
-        elif datatype_name == "url":
-            expected = {"url": "", "url_label": ""}
-        else:
-            expected = None
-        self.assertEqual(value, expected)
-
-
-class DatatypeRepresentationTests(GraphTestCase, AssertNoneishMixin):
+class DatatypeRepresentationTests(GraphTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
@@ -128,10 +113,10 @@ class DatatypeRepresentationTests(GraphTestCase, AssertNoneishMixin):
                     value = getattr(resource_data, lookup)
                     self.assertEqual(value.get("interchange_value"), interchange_value)
                     value = getattr(resource_data_none, lookup)
-                    self.assertNoneish(value.get("interchange_value"), datatype)
+                    self.assertIsNone(value.get("interchange_value"), datatype)
 
 
-class DatatypePythonTests(GraphTestCase, AssertNoneishMixin):
+class DatatypePythonTests(GraphTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
@@ -176,4 +161,4 @@ class DatatypePythonTests(GraphTestCase, AssertNoneishMixin):
                     value = getattr(resource_data, lookup)
                     self.assertEqual(value, python_value)
                     value = getattr(resource_data_none, lookup)
-                    self.assertNoneish(value, datatype)
+                    self.assertIsNone(value, datatype)
