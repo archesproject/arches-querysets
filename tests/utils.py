@@ -4,6 +4,7 @@ import uuid
 from django.test import TestCase
 
 from arches import VERSION as arches_version
+from arches.app.models.graph import Graph
 from arches.app.models.models import (
     CardModel,
     CardXNodeXWidget,
@@ -34,6 +35,7 @@ class GraphTestCase(TestCase):
         cls.create_tiles_with_data()
         cls.create_tiles_with_none()
         cls.create_relations()
+        Graph.objects.get(pk=cls.graph.pk).publish()
 
     @classmethod
     def create_graph(cls):
@@ -154,8 +156,8 @@ class GraphTestCase(TestCase):
             },
             "url": {"url": "http://arthurdent.com", "url_label": ""},
             "boolean": False,
-            "number": 42,
-            "date": "1979-10-12",
+            "number": 7,
+            "date": "1979-10-12T00:00:00.000-05:00",
             # "resource-instance": None,
             # "resource-instance-list": [],
             # "concept": None,
