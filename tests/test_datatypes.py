@@ -1,6 +1,6 @@
 import json
 
-from arches_querysets.models import SemanticResource
+from arches_querysets.models import ResourceTileTree
 from tests.utils import GraphTestCase
 
 
@@ -8,15 +8,15 @@ class DatatypeRepresentationTests(GraphTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        resources = SemanticResource.as_model(
+        resources = ResourceTileTree.get_tiles(
             "datatype_lookups", as_representation=True
         )
-        cls.semantic_resource_42 = resources.get(pk=cls.resource_42.pk)
-        cls.semantic_resource_none = resources.get(pk=cls.resource_none.pk)
-        cls.datatype_1 = cls.semantic_resource_42.aliased_data.datatypes_1
-        cls.datatype_n = cls.semantic_resource_42.aliased_data.datatypes_n
-        cls.datatype_1_none = cls.semantic_resource_none.aliased_data.datatypes_1
-        cls.datatype_n_none = cls.semantic_resource_none.aliased_data.datatypes_n
+        cls.resource_42 = resources.get(pk=cls.resource_42.pk)
+        cls.resource_none = resources.get(pk=cls.resource_none.pk)
+        cls.datatype_1 = cls.resource_42.aliased_data.datatypes_1
+        cls.datatype_n = cls.resource_42.aliased_data.datatypes_n
+        cls.datatype_1_none = cls.resource_none.aliased_data.datatypes_1
+        cls.datatype_n_none = cls.resource_none.aliased_data.datatypes_n
 
     def test_as_representation_display_values(self):
         display_values = {
@@ -120,15 +120,15 @@ class DatatypePythonTests(GraphTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        resources = SemanticResource.as_model(
+        resources = ResourceTileTree.get_tiles(
             "datatype_lookups", as_representation=False
         )
-        cls.semantic_resource = resources.get(pk=cls.resource_42.pk)
-        cls.semantic_resource_none = resources.get(pk=cls.resource_none.pk)
-        cls.datatype_1 = cls.semantic_resource.aliased_data.datatypes_1
-        cls.datatype_n = cls.semantic_resource.aliased_data.datatypes_n
-        cls.datatype_1_none = cls.semantic_resource_none.aliased_data.datatypes_1
-        cls.datatype_n_none = cls.semantic_resource_none.aliased_data.datatypes_n
+        cls.resource = resources.get(pk=cls.resource_42.pk)
+        cls.resource_none = resources.get(pk=cls.resource_none.pk)
+        cls.datatype_1 = cls.resource.aliased_data.datatypes_1
+        cls.datatype_n = cls.resource.aliased_data.datatypes_n
+        cls.datatype_1_none = cls.resource_none.aliased_data.datatypes_1
+        cls.datatype_n_none = cls.resource_none.aliased_data.datatypes_n
 
     def test_python_values(self):
         python_values = {

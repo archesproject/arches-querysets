@@ -17,7 +17,7 @@ from arches_querysets.utils.models import (
 NOT_PROVIDED = object()
 
 
-class SemanticTileManager(models.Manager):
+class TileTreeManager(models.Manager):
     def get_queryset(self):
         qs = super().get_queryset().select_related("nodegroup", "parenttile")
         if arches_version >= (8, 0):
@@ -33,7 +33,7 @@ class SemanticTileManager(models.Manager):
         return qs
 
 
-class SemanticTileQuerySet(models.QuerySet):
+class TileTreeQuerySet(models.QuerySet):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._as_representation = False
@@ -41,10 +41,12 @@ class SemanticTileQuerySet(models.QuerySet):
         self._permitted_nodes = []
         self._entry_node = None
 
-    def with_node_values(
+    def get_tiles(
         self,
-        permitted_nodes,
+        graph_slug,
+        nodegroup_alias=None,
         *,
+        permitted_nodes,
         defer=None,
         only=None,
         as_representation=False,
@@ -55,7 +57,7 @@ class SemanticTileQuerySet(models.QuerySet):
         Entry point for filtering arches data by nodegroups (instead of grouping by
         resource.)
 
-        >>> statements = SemanticTile.as_nodegroup("statement", graph_slug="concept")
+        >>> statements = TileTree.get_tiles("concept", "statement")
         # TODO: show this with some test node that's actually a localized string.
         >>> results = statements.filter(statement_content__any_lang_startswith="F")
         >>> for result in results:
@@ -71,7 +73,7 @@ class SemanticTileQuerySet(models.QuerySet):
             - True: calls to_json() datatype methods
             - False: calls to_python() datatype methods
         """
-        from arches_querysets.models import SemanticResource
+        from arches_querysets.models import ResourceTileTree
 
         self._as_representation = as_representation
 
@@ -108,7 +110,8 @@ class SemanticTileQuerySet(models.QuerySet):
             qs = qs.prefetch_related(
                 models.Prefetch(
                     "children" if arches_version >= (8, 0) else "tilemodel_set",
-                    queryset=self.model.objects.get_queryset().with_node_values(
+                    queryset=self.model.objects.get_queryset().get_tiles(
+                        graph_slug=graph_slug,
                         permitted_nodes=permitted_nodes,
                         defer=defer,
                         only=only,
@@ -124,7 +127,7 @@ class SemanticTileQuerySet(models.QuerySet):
         qs = qs.prefetch_related(
             models.Prefetch(
                 "resourceinstance",
-                SemanticResource.objects.with_related_resource_display_names(
+                ResourceTileTree.objects.with_related_resource_display_names(
                     nodes=self._queried_nodes
                 ),
             ),
@@ -221,14 +224,14 @@ class SemanticTileQuerySet(models.QuerySet):
         return clone
 
 
-class SemanticResourceQuerySet(models.QuerySet):
+class ResourceTileTreeQuerySet(models.QuerySet):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._as_representation = False
         self._queried_nodes = []
         self._permitted_nodes = []
 
-    def with_nodegroups(
+    def get_tiles(
         self,
         graph_slug=None,
         *,
@@ -238,18 +241,18 @@ class SemanticResourceQuerySet(models.QuerySet):
         as_representation=False,
         user=None,
     ):
-        """Annotates a SemanticResourceQuerySet with tile data unpacked
+        """Annotates a ResourceTileTreeQuerySet with tile data unpacked
         and mapped onto nodegroup aliases, e.g.:
 
-        >>> concepts = SemanticResource.objects.with_nodegroups("concept")
+        >>> concepts = ResourceTileTree.objects.get_tiles("concept")
 
         With slightly fewer keystrokes:
 
-        >>> concepts = SemanticResource.as_model("concept")
+        >>> concepts = ResourceTileTree.get_tiles("concept")
 
         Or direct certain nodegroups with defer/only as in the QuerySet interface:
 
-        >>> partial_concepts = SemanticResource.as_model("concept", only=["ng1", "ng2"])
+        >>> partial_concepts = ResourceTileTree.get_tiles("concept", only=["ng1", "ng2"])
 
         Django QuerySet methods are available for efficient queries:
         >>> concepts.count()
@@ -288,7 +291,7 @@ class SemanticResourceQuerySet(models.QuerySet):
             - True: calls to_json() datatype methods
             - False: calls to_python() datatype methods
         """
-        from arches_querysets.models import GraphWithPrefetching, SemanticTile
+        from arches_querysets.models import GraphWithPrefetching, TileTree
 
         self._as_representation = as_representation
 
@@ -324,8 +327,9 @@ class SemanticResourceQuerySet(models.QuerySet):
         return qs.prefetch_related(
             models.Prefetch(
                 "tilemodel_set",
-                queryset=SemanticTile.objects.with_node_values(
-                    self._permitted_nodes,
+                queryset=TileTree.objects.get_tiles(
+                    graph_slug=graph_slug,
+                    permitted_nodes=self._permitted_nodes,
                     as_representation=as_representation,
                 ),
                 to_attr="_annotated_tiles",
