@@ -171,10 +171,10 @@ class TileTreeQuerySet(models.QuerySet):
 
     def _set_child_tile_data(self, tile):
         if arches_version >= (8, 0):
-            fallback = getattr(tile, "children")
+            child_tiles = getattr(tile, "children")
         else:
-            fallback = getattr(tile, "tilemodel_set")
-        for child_tile in getattr(tile, "_annotated_tiles", fallback.all()):
+            child_tiles = getattr(tile, "tilemodel_set")
+        for child_tile in child_tiles.all():
             child_nodegroup_alias = child_tile.find_nodegroup_alias()
             if child_tile.nodegroup.cardinality == "1":
                 setattr(tile.aliased_data, child_nodegroup_alias, child_tile)
@@ -325,7 +325,6 @@ class ResourceTileTreeQuerySet(models.QuerySet):
                     permitted_nodes=self._permitted_nodes,
                     as_representation=as_representation,
                 ),
-                to_attr="_annotated_tiles",
             ),
         ).alias(**node_sql_aliases)
 
@@ -367,7 +366,7 @@ class ResourceTileTreeQuerySet(models.QuerySet):
                 setattr(resource.aliased_data, grouping_node.alias, default)
 
             # Fill aliased data with top nodegroup data.
-            for annotated_tile in getattr(resource, "_annotated_tiles", []):
+            for annotated_tile in resource.tilemodel_set.all():
                 if annotated_tile.nodegroup.parentnodegroup_id:
                     continue
                 nodegroup_alias = grouping_nodes[annotated_tile.nodegroup_id].alias
