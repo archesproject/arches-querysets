@@ -657,22 +657,22 @@ class GraphWithPrefetching(GraphModel):
             "node_set__nodegroup__node_set__cardxnodexwidget_set",
             "node_set__nodegroup__cardmodel_set",
             *get_recursive_prefetches(
-                f"node_set__nodegroup__{children}", depth=12, recursive_part="children"
+                f"node_set__nodegroup__{children}", depth=12, recursive_part=children
             ),
             *get_recursive_prefetches(
                 f"node_set__nodegroup__{children}__node_set",
                 depth=12,
-                recursive_part="children",
+                recursive_part=children,
             ),
             *get_recursive_prefetches(
                 f"node_set__nodegroup__{children}__cardmodel_set",
                 depth=12,
-                recursive_part="children",
+                recursive_part=children,
             ),
             *get_recursive_prefetches(
                 f"node_set__nodegroup__{children}__node_set__cardxnodexwidget_set",
                 depth=12,
-                recursive_part="children",
+                recursive_part=children,
             ),
         ]
 
