@@ -366,15 +366,15 @@ class ResourceTileTreeQuerySet(models.QuerySet):
                 setattr(resource.aliased_data, grouping_node.alias, default)
 
             # Fill aliased data with top nodegroup data.
-            for annotated_tile in resource.tilemodel_set.all():
-                if annotated_tile.nodegroup.parentnodegroup_id:
+            for tile in resource.tilemodel_set.all():
+                if tile.nodegroup.parentnodegroup_id:
                     continue
-                nodegroup_alias = grouping_nodes[annotated_tile.nodegroup_id].alias
-                if annotated_tile.nodegroup.cardinality == "n":
+                nodegroup_alias = grouping_nodes[tile.nodegroup_id].alias
+                if tile.nodegroup.cardinality == "n":
                     tile_array = getattr(resource.aliased_data, nodegroup_alias)
-                    tile_array.append(annotated_tile)
+                    tile_array.append(tile)
                 else:
-                    setattr(resource.aliased_data, nodegroup_alias, annotated_tile)
+                    setattr(resource.aliased_data, nodegroup_alias, tile)
 
     def _clone(self):
         """Persist private attributes through the life of the QuerySet."""
