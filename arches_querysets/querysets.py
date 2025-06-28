@@ -6,7 +6,7 @@ from django.db import models
 from django.utils.translation import gettext as _
 
 from arches import VERSION as arches_version
-from arches.app.models.models import Node, ResourceXResource
+from arches.app.models.models import Node
 
 from arches_querysets.datatypes.datatypes import DataTypeFactory
 from arches_querysets.utils.models import (
@@ -22,6 +22,10 @@ class TileTreeManager(models.Manager):
         qs = super().get_queryset().select_related("nodegroup", "parenttile")
         if arches_version >= (8, 0):
             qs = qs.select_related("nodegroup__grouping_node")
+            qs = qs.prefetch_related(
+                "nodegroup__children__node_set",
+                "resourceinstance__from_resxres__to_resource",
+            )
         else:
             # Annotate nodegroup_alias on Arches 7.6.
             qs = qs.annotate(
@@ -29,6 +33,10 @@ class TileTreeManager(models.Manager):
                     pk=models.F("nodegroup_id"),
                     nodegroup__tilemodel=models.OuterRef("tileid"),
                 ).values("alias")[:1]
+            )
+            qs = qs.prefetch_related(
+                "nodegroup__nodegroup_set__node_set",
+                "resourceinstance__resxres_resource_instance_ids_from__resourceinstanceidto",
             )
         return qs
 
@@ -73,8 +81,6 @@ class TileTreeQuerySet(models.QuerySet):
             - True: calls to_json() datatype methods
             - False: calls to_python() datatype methods
         """
-        from arches_querysets.models import ResourceTileTree
-
         self._as_representation = as_representation
 
         deferred_node_aliases = {
@@ -87,7 +93,7 @@ class TileTreeQuerySet(models.QuerySet):
             for n in permitted_nodes
             if getattr(n.nodegroup, "nodegroup_alias", None) in (only or [])
         }
-        node_alias_annotations = generate_node_alias_expressions(
+        node_alias_expressions = generate_node_alias_expressions(
             permitted_nodes,
             defer=deferred_node_aliases,
             only=only_node_aliases,
@@ -96,7 +102,7 @@ class TileTreeQuerySet(models.QuerySet):
 
         self._permitted_nodes = permitted_nodes  # permitted nodes below entry point
         self._queried_nodes = [
-            n for n in permitted_nodes if n.alias in node_alias_annotations
+            n for n in permitted_nodes if n.alias in node_alias_expressions
         ]
         self._entry_node = entry_node
 
@@ -118,29 +124,16 @@ class TileTreeQuerySet(models.QuerySet):
                         as_representation=as_representation,
                         depth=depth - 1,
                     ),
+                    # Using to_attr ensures the query results materialize into
+                    # TileTree objects rather than TileModel objects.
+                    to_attr="_tile_trees",
                 )
             )
 
-        # TODO: some of these can just be aliases.
-        qs = qs.annotate(**node_alias_annotations).order_by("sortorder")
-
-        qs = qs.prefetch_related(
-            models.Prefetch(
-                "resourceinstance",
-                ResourceTileTree.objects.with_related_resource_display_names(
-                    nodes=self._queried_nodes
-                ),
-            ),
-        )
-        return qs
+        return qs.alias(**node_alias_expressions).order_by("sortorder")
 
     def _prefetch_related_objects(self):
-        """Call datatype to_python() methods when materializing the QuerySet.
-        Discard annotations that do not pertain to this nodegroup.
-        Memoize fetched nodes.
-        Attach child tiles to parent tiles and vice versa.
-        """
-
+        """Hook into QuerySet evaluation to customize the result."""
         # Overriding _fetch_all() doesn't work here: causes dupe child tiles.
         # Perhaps these manual annotations could be scheduled another way?
         super()._prefetch_related_objects()
@@ -151,15 +144,16 @@ class TileTreeQuerySet(models.QuerySet):
             raise RuntimeError(e) from e
 
     def _set_aliased_data(self):
+        """Call datatype to_python() methods when materializing the QuerySet.
+        Memoize fetched nodes. Attach child tiles to parent tiles and vice versa.
+        """
         for tile in self._result_cache:
             if not isinstance(tile, self.model):
                 return
             break
 
         for tile in self._result_cache:
-            tile._queried_nodes = self._queried_nodes
-            tile._permitted_nodes = self._permitted_nodes
-            tile._as_representation = self._as_representation
+            tile.sync_private_attributes(self)
             for node in self._queried_nodes:
                 if node.nodegroup_id == tile.nodegroup_id:
                     datatype_instance = DataTypeFactory().get_instance(node.datatype)
@@ -173,16 +167,11 @@ class TileTreeQuerySet(models.QuerySet):
                 elif node.nodegroup.parentnodegroup_id == tile.nodegroup_id:
                     empty_value = None if node.nodegroup.cardinality == "1" else []
                     setattr(tile.aliased_data, tile.find_nodegroup_alias(), empty_value)
-                delattr(tile, node.alias)
 
             self._set_child_tile_data(tile)
 
     def _set_child_tile_data(self, tile):
-        if arches_version >= (8, 0):
-            fallback = getattr(tile, "children")
-        else:
-            fallback = getattr(tile, "tilemodel_set")
-        for child_tile in getattr(tile, "_annotated_tiles", fallback.all()):
+        for child_tile in getattr(tile, "_tile_trees", []):
             child_nodegroup_alias = child_tile.find_nodegroup_alias()
             if child_tile.nodegroup.cardinality == "1":
                 setattr(tile.aliased_data, child_nodegroup_alias, child_tile)
@@ -192,6 +181,7 @@ class TileTreeQuerySet(models.QuerySet):
                 setattr(tile.aliased_data, child_nodegroup_alias, children)
             # Attach parent to this child.
             child_tile.parent = tile
+            child_tile.sync_private_attributes(tile)
 
         child_nodegroups = (
             getattr(tile.nodegroup, "children")
@@ -295,7 +285,7 @@ class ResourceTileTreeQuerySet(models.QuerySet):
 
         self._as_representation = as_representation
 
-        source_graph = GraphWithPrefetching.prepare_for_annotations(
+        source_graph = GraphWithPrefetching.prefetch(
             graph_slug, resource_ids=resource_ids, user=user
         )
         self._permitted_nodes = source_graph.permitted_nodes
@@ -332,46 +322,25 @@ class ResourceTileTreeQuerySet(models.QuerySet):
                     permitted_nodes=self._permitted_nodes,
                     as_representation=as_representation,
                 ),
-                to_attr="_annotated_tiles",
+                to_attr="_tile_trees",
             ),
-        ).annotate(**node_sql_aliases)
-
-    def with_related_resource_display_names(self, nodes=None):
-        if arches_version >= (8, 0):
-            return self.prefetch_related(
-                models.Prefetch(
-                    "from_resxres",
-                    queryset=ResourceXResource.objects.filter(
-                        node__in=nodes
-                    ).prefetch_related("to_resource"),
-                    to_attr="from_resxres_for_queried_nodes",
-                ),
-            )
-        else:
-            return self.prefetch_related(
-                models.Prefetch(
-                    "resxres_resource_instance_ids_from",
-                    queryset=ResourceXResource.objects.filter(
-                        nodeid__in=nodes
-                    ).prefetch_related("resourceinstanceidto"),
-                    to_attr="from_resxres_for_queried_nodes",
-                ),
-            )
+        ).alias(**node_sql_aliases)
 
     def _fetch_all(self):
+        """Hook into QuerySet evaluation to customize the result."""
+        super()._fetch_all()
+        try:
+            self._set_aliased_data()
+        except (TypeError, ValueError, ValidationError) as e:
+            # These errors are caught by DRF, so re-raise as something else.
+            raise RuntimeError from e
+
+    def _set_aliased_data(self):
         """
         Attach top-level tiles to resource instances.
         Attach resource instances to all fetched tiles.
         Memoize fetched grouping node aliases (and graph source nodes).
         """
-        super()._fetch_all()
-        try:
-            self._perform_custom_annotations()
-        except (TypeError, ValueError, ValidationError) as e:
-            # These errors are caught by DRF, so re-raise as something else.
-            raise RuntimeError from e
-
-    def _perform_custom_annotations(self):
         grouping_nodes = {}
         for node in self._permitted_nodes:
             if not node.nodegroup:
@@ -387,8 +356,7 @@ class ResourceTileTreeQuerySet(models.QuerySet):
             resource._queried_nodes = self._queried_nodes
             resource._as_representation = self._as_representation
 
-            # Prepare resource annotations.
-            # TODO: this might move to a method on AliasedData.
+            # Prepare empty aliased data containers.
             for grouping_node in grouping_nodes.values():
                 if grouping_node.nodegroup.parentnodegroup_id:
                     continue
@@ -396,16 +364,15 @@ class ResourceTileTreeQuerySet(models.QuerySet):
                 setattr(resource.aliased_data, grouping_node.alias, default)
 
             # Fill aliased data with top nodegroup data.
-            annotated_tiles = getattr(resource, "_annotated_tiles", [])
-            for annotated_tile in annotated_tiles:
-                if annotated_tile.nodegroup.parentnodegroup_id:
+            for tile in getattr(resource, "_tile_trees", []):
+                if tile.nodegroup.parentnodegroup_id:
                     continue
-                ng_alias = grouping_nodes[annotated_tile.nodegroup_id].alias
-                if annotated_tile.nodegroup.cardinality == "n":
-                    tile_array = getattr(resource.aliased_data, ng_alias)
-                    tile_array.append(annotated_tile)
+                nodegroup_alias = grouping_nodes[tile.nodegroup_id].alias
+                if tile.nodegroup.cardinality == "n":
+                    tile_array = getattr(resource.aliased_data, nodegroup_alias)
+                    tile_array.append(tile)
                 else:
-                    setattr(resource.aliased_data, ng_alias, annotated_tile)
+                    setattr(resource.aliased_data, nodegroup_alias, tile)
 
     def _clone(self):
         """Persist private attributes through the life of the QuerySet."""
@@ -416,7 +383,8 @@ class ResourceTileTreeQuerySet(models.QuerySet):
         return clone
 
 
-class GraphWithPrefetchingQuerySet(models.QuerySet):
+# TODO (arches_version): remove when dropping 7.6
+class GraphWithPrefetchingQuerySet(models.QuerySet):  # pragma: no cover
     """Backport of Arches 8.0 GraphQuerySet."""
 
     def make_name_unique(self, name, names_to_check, suffix_delimiter="_"):

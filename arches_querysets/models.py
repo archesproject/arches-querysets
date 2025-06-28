@@ -127,7 +127,7 @@ class ResourceTileTree(ResourceInstance):
                     nodegroup_alias, self._permitted_nodes
                 )
                 blank_tile = TileTree(resourceinstance=self, nodegroup=nodegroup)
-                blank_tile._as_representation = self._as_representation
+                blank_tile.sync_private_attributes(self)
                 blank_tile = blank_tile.create_blank_tile(nodegroup)
             if value == []:
                 value.append(blank_tile)
@@ -257,7 +257,7 @@ class TileTree(TileModel):
 
     def find_nodegroup_alias(self):
         # TileTreeManager provides grouping_node on 7.6
-        if self.nodegroup and hasattr(self.nodegroup, "grouping_node"):
+        if self.nodegroup_id and hasattr(self.nodegroup, "grouping_node"):
             return self.nodegroup.grouping_node.alias
         if not getattr(self, "_nodegroup_alias", None):
             self._nodegroup_alias = Node.objects.get(pk=self.nodegroup_id).alias
@@ -315,7 +315,7 @@ class TileTree(TileModel):
     ):
         """See `arches_querysets.querysets.TileTreeQuerySet.get_tiles`."""
 
-        source_graph = GraphWithPrefetching.prepare_for_annotations(
+        source_graph = GraphWithPrefetching.prefetch(
             graph_slug, resource_ids=resource_ids, user=user
         )
         for node in source_graph.permitted_nodes:
@@ -326,7 +326,7 @@ class TileTree(TileModel):
             raise Node.DoesNotExist(f"graph: {graph_slug} node: {nodegroup_alias}")
 
         if not entry_node.nodegroup:
-            raise ValueError(f'"{entry_node_alias}" is a top node.')
+            raise ValueError(f'"{nodegroup_alias}" is a top node.')
 
         entry_node_and_nodes_below = []
         for nodegroup in get_nodegroups_here_and_below(entry_node.nodegroup):
@@ -370,6 +370,11 @@ class TileTree(TileModel):
                 self.set_next_sort_order()
             self._save_aliased_data(request=request, index=index, **kwargs)
 
+    def sync_private_attributes(self, source):
+        self._as_representation = source._as_representation
+        self._queried_nodes = source._queried_nodes
+        self._permitted_nodes = source._permitted_nodes
+
     def create_blank_tile(self, nodegroup, parent_tile=None):
         children = (
             nodegroup.children.all()
@@ -388,7 +393,9 @@ class TileTree(TileModel):
                 if node.datatype != "semantic"
             },
             **{
-                TileTree(nodegroup=child_nodegroup).find_nodegroup_alias(): (
+                self.find_nodegroup_from_alias_or_pk(
+                    pk=child_nodegroup.pk
+                )._nodegroup_alias: (
                     self.create_blank_tile(child_nodegroup, parent_tile=self)
                     if child_nodegroup.cardinality == "1"
                     else [self.create_blank_tile(child_nodegroup, parent_tile=self)]
@@ -396,7 +403,7 @@ class TileTree(TileModel):
                 for child_nodegroup in children
             },
         )
-        blank_tile._as_representation = self._as_representation
+        blank_tile.sync_private_attributes(self)
 
         # Finalize the aliased data according to the value of self._as_representation.
         # (e.g. either a dict of display_value & interchange_value, or call to_python().)
@@ -414,19 +421,10 @@ class TileTree(TileModel):
         if not vars(self.aliased_data):
             return
 
-        def find_nodegroup_from_alias(nodegroup_alias):
-            for fetched_node in self._permitted_nodes:
-                if (
-                    fetched_node.alias == nodegroup_alias
-                    and fetched_node.nodegroup.parentnodegroup_id == self.nodegroup_id
-                ):
-                    return fetched_node.nodegroup
-            raise Exception
-
         for alias, value in vars(self.aliased_data).items():
             try:
-                nodegroup = find_nodegroup_from_alias(alias)
-            except:
+                nodegroup = self.find_nodegroup_from_alias_or_pk(alias=alias)
+            except RuntimeError:  # possibly not permitted
                 continue
             if value in (None, []):
                 blank_tile = self.create_blank_tile(nodegroup, self)
@@ -438,10 +436,20 @@ class TileTree(TileModel):
             # Recurse.
             if isinstance(value, list):
                 for tile in value:
-                    tile.fill_blanks()
+                    if isinstance(tile, TileTree):
+                        tile.fill_blanks()
             else:
                 tile = value or blank_tile
-                tile.fill_blanks()
+                if isinstance(tile, TileTree):
+                    tile.fill_blanks()
+
+    def find_nodegroup_from_alias_or_pk(self, alias=None, *, pk=None):
+        """Some of this complexity can be removed when dropping 7.6."""
+        for permitted_node in self._permitted_nodes:
+            if permitted_node.alias == alias or permitted_node.pk == pk:
+                permitted_node.nodegroup._nodegroup_alias = permitted_node.alias
+                return permitted_node.nodegroup
+        raise RuntimeError
 
     @staticmethod
     def get_default_value(node):
@@ -493,10 +501,7 @@ class TileTree(TileModel):
         given the current implementation that doesn't serialize them."""
 
         datatype_factory = DataTypeFactory()
-        # Not object-oriented because TileModel.nodegroup is a property.
-        for node in Node.objects.filter(nodegroup_id=self.nodegroup_id).only(
-            "datatype"
-        ):
+        for node in self.nodegroup.node_set.all():
             if node.datatype == "semantic":
                 continue
             node_id_str = str(node.nodeid)
@@ -621,7 +626,7 @@ class GraphWithPrefetching(GraphModel):
         db_table = "graphs"
 
     @classmethod
-    def prepare_for_annotations(cls, graph_slug=None, *, resource_ids=None, user=None):
+    def prefetch(cls, graph_slug=None, *, resource_ids=None, user=None):
         """Return a graph with necessary prefetches for
         TileTree._prefetch_related_objects(), which is what builds the shape
         of the tile graph.
@@ -641,64 +646,35 @@ class GraphWithPrefetching(GraphModel):
             raise ValueError("graph_slug or resource_ids must be provided")
 
         if arches_version >= (8, 0):
-            prefetches = [
-                "node_set__cardxnodexwidget_set",
-                "node_set__nodegroup__parentnodegroup",
-                "node_set__nodegroup__node_set",
-                "node_set__nodegroup__node_set__cardxnodexwidget_set",
-                "node_set__nodegroup__cardmodel_set",
-                *get_recursive_prefetches(
-                    "node_set__nodegroup__children",
-                    depth=12,
-                    recursive_part="children",
-                ),
-                *get_recursive_prefetches(
-                    "node_set__nodegroup__children__node_set",
-                    depth=12,
-                    recursive_part="children",
-                ),
-                *get_recursive_prefetches(
-                    "node_set__nodegroup__children__node_set__cardxnodexwidget_set",
-                    depth=12,
-                    recursive_part="children",
-                ),
-                *get_recursive_prefetches(
-                    "node_set__nodegroup__children__cardmodel_set",
-                    depth=12,
-                    recursive_part="children",
-                ),
-                # TODO: determine if these last two are still used?
-                "node_set__nodegroup__grouping_node__nodegroup",
-                "node_set__nodegroup__children__grouping_node",
-            ]
+            children = "children"
         else:
-            prefetches = [
-                "node_set__cardxnodexwidget_set",
-                "node_set__nodegroup__parentnodegroup",
-                "node_set__nodegroup__node_set",
-                "node_set__nodegroup__node_set__cardxnodexwidget_set",
-                "node_set__nodegroup__cardmodel_set",
-                *get_recursive_prefetches(
-                    "node_set__nodegroup__nodegroup_set",
-                    depth=12,
-                    recursive_part="nodegroup_set",
-                ),
-                *get_recursive_prefetches(
-                    "node_set__nodegroup__nodegroup_set__node_set",
-                    depth=12,
-                    recursive_part="nodegroup_set",
-                ),
-                *get_recursive_prefetches(
-                    "node_set__nodegroup__nodegroup_set__cardmodel_set",
-                    depth=12,
-                    recursive_part="nodegroup_set",
-                ),
-                *get_recursive_prefetches(
-                    "node_set__nodegroup__nodegroup_set__node_set__cardxnodexwidget_set",
-                    depth=12,
-                    recursive_part="nodegroup_set",
-                ),
-            ]
+            children = "nodegroup_set"
+
+        prefetches = [
+            "node_set__cardxnodexwidget_set",
+            "node_set__nodegroup__parentnodegroup",
+            "node_set__nodegroup__node_set",
+            "node_set__nodegroup__node_set__cardxnodexwidget_set",
+            "node_set__nodegroup__cardmodel_set",
+            *get_recursive_prefetches(
+                f"node_set__nodegroup__{children}", depth=12, recursive_part=children
+            ),
+            *get_recursive_prefetches(
+                f"node_set__nodegroup__{children}__node_set",
+                depth=12,
+                recursive_part=children,
+            ),
+            *get_recursive_prefetches(
+                f"node_set__nodegroup__{children}__cardmodel_set",
+                depth=12,
+                recursive_part=children,
+            ),
+            *get_recursive_prefetches(
+                f"node_set__nodegroup__{children}__node_set__cardxnodexwidget_set",
+                depth=12,
+                recursive_part=children,
+            ),
+        ]
 
         if user:
             permitted_nodegroups = get_nodegroups_by_perm(user, "models.read_nodegroup")
@@ -717,8 +693,7 @@ class GraphWithPrefetching(GraphModel):
                 e.add_note(f"No graph found with slug: {graph_slug}")
             raise
 
-        if arches_version < (8, 0):
-            graph._annotate_grouping_node()
+        graph._annotate_grouping_node()
 
         return graph
 
@@ -735,7 +710,12 @@ class GraphWithPrefetching(GraphModel):
         for node in self.permitted_nodes:
             if nodegroup := node.nodegroup:
                 nodegroup.grouping_node = grouping_node_map.get(nodegroup.pk)
-                for child_nodegroup in nodegroup.nodegroup_set.all():
+                children = (
+                    nodegroup.children.all()
+                    if arches_version >= (8, 0)
+                    else nodegroup.nodegroup_set.all()
+                )
+                for child_nodegroup in children:
                     child_nodegroup.grouping_node = grouping_node_map.get(
                         child_nodegroup.pk
                     )
