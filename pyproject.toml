@@ -11,7 +11,7 @@ authors = [
 license = "AGPL-3.0-or-later"
 description = "A Django-native interface for Arches implementers to express application logic, query business data, and build APIs."
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
@@ -28,7 +28,7 @@ requires-python = ">=3.10"
 dependencies = [
     "arches>=7.6.12,<8.1.0,!=8.0.0",
 ]
-version = "0.2.0-dev"
+version = "1.0.0b0"
 
 [project.optional-dependencies]
 drf = ["djangorestframework~=3.16"]
