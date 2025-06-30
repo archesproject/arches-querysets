@@ -98,6 +98,7 @@ Vary: Accept
                         ...
 ```
 </details>
+
 - At the bottom of the page, switch to the JSON view to edit the payload and save back. (You can also provide interchange
 values directly rather than wrapping them under an `interchange_value` key.)
 - The schema for the interchange value is [tested here](https://github.com/archesproject/arches-querysets/blob/main/tests/test_datatypes.py).
