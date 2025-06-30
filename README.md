@@ -1,7 +1,9 @@
 ## arches-querysets
 
-A Django-native interface for expressing application logic,
-querying business data, or building APIs using node and nodegroup aliases.
+A Django-native interface for Arches implementers to express application logic,
+query business data, or build APIs using node and nodegroup aliases.
+
+Please see the [project page](http://archesproject.org/) for more information on the Arches project.
 
 ### Installation
 The optional API integration with Django REST Framework is included below.
@@ -30,6 +32,8 @@ urlpatterns = [
     *arches_rest_framework_urls,
 ]
 ```
+
+For developer install instructions, see the [Developer Setup](#developer-setup-for-contributing-to-the-arches-querysets-project) section below.
 
 ### Quickstart
 ```shell
@@ -230,3 +234,71 @@ Contributions and bug reports are welcome!
 ### Thanks
 
 We are grateful to members of the Arches community that have shared prior work in this area: in particular, the approaches linked in the [precedents](#how-does-this-compare-to-other-approaches).
+
+### Developer Setup (for contributing to the Arches Querysets project)
+
+1. Download the arches-querysets repo:
+
+    a.  If using the [Github CLI](https://cli.github.com/): `gh repo clone archesproject/arches-querysets`
+    
+    b.  If not using the Github CLI: `git clone https://github.com/archesproject/arches-querysets.git`
+
+2. Download the arches package:
+
+    a.  If using the [Github CLI](https://cli.github.com/): `gh repo clone archesproject/arches`
+
+    b.  If not using the Github CLI: `git clone https://github.com/archesproject/arches.git`
+
+3. Create a virtual environment outside of both repositories: 
+    ```
+    python3 -m venv ENV
+    ```
+
+4. Activate the virtual enviroment in your terminal:
+    ```
+    source ENV/bin/activate
+    ```
+
+5. Navigate to the `arches-querysets` directory, and install the project (with optional and development dependencies):
+    ```
+    cd arches-querysets
+    pip install -e '.[drf]' --group dev
+    ```
+
+6. Also install core arches for local development:
+    ```
+    pip install -e ../arches
+    ```
+
+7. Run the Django server:
+    ```
+    python manage.py runserver
+    ```
+
+## Committing changes
+
+NOTE: Changes are committed to the arches-querysets repository. 
+
+1. Navigate to the repository
+    ```
+    cd arches-querysets
+    ```
+
+2. Cut a new git branch
+    ```
+    git checkout origin/main -b my-descriptive-branch-name
+    ```
+
+3. Add your changes to the current git commit
+    ```
+    git status
+    git add -- path/to/file path/to/second/file
+    git commit -m "Descriptive commit message"
+    ```
+
+4. Update the remote repository with your commits:
+    ```
+    git push origin HEAD
+    ```
+
+5. Navigate to https://github.com/archesproject/arches-querysets/pulls to see and commit the pull request.
