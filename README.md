@@ -1,17 +1,16 @@
 ## arches-querysets
 
 A Django-native interface for expressing application logic,
-querying business data, or building APIs using semantic labels: node and nodegroup aliases (rather than UUIDs).
+querying business data, or building APIs using node and nodegroup aliases.
 
 ### Installation
-(The optional integration with Django REST Framework is included below.)
+The optional API integration with Django REST Framework is included below.
 
-In pyproject.toml:
+`pip install arches-querysets[drf]`, or, in pyproject.toml:
 ```
 dependencies = [
     ...
-    "arches_querysets @ git+https://github.com/archesproject/arches-querysets@main",
-    "djangorestframework",
+    "arches_querysets[drf]",
 ]
 ```
 In settings.py:
@@ -22,16 +21,145 @@ INSTALLED_APPS = [
     "rest_framework",  # if you are using the Django REST Framework integration
     ...
 ]
-
-REST_FRAMEWORK = {
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.LimitOffsetPagination",
-    "PAGE_SIZE": API_MAX_PAGE_SIZE,
-}
+```
+In urls.py:
+```
+from arches_querysets.urls import arches_rest_framework_urls
+urlpatterns = [
+    ...
+    *arches_rest_framework_urls,
+]
 ```
 
-### Usage
+### Quickstart
+```shell
+python manage.py add_test_data
+python manage.py runserver
 ```
-forthcoming
+
+#### API usage
+Log in to Arches, then visit `/api/resources/datatype_lookups` to explore the data for the ["datatype_lookups" test model](https://github.com/archesproject/arches-querysets/blob/88c284a458fbf2f4757621d0d381a9bf4ea6a96c/tests/utils.py#L24) using the [browsable API](https://www.django-rest-framework.org/topics/browsable-api/).
+
+You'll see a tree of tiles with nodegroup data grouped under an `"aliased_data"` key:
+
+<details>
+<summary>Example response</summary>
+
+Note that below "string", "number", "concept", etc. are node aliases.
+```json
+GET /api/resource/datatype_lookups
+
+HTTP 200 OK
+Allow: GET, POST, HEAD, OPTIONS
+Content-Type: application/json
+Vary: Accept
+
+{
+    "count": 2,
+    "next": null,
+    "previous": null,
+    "results": [
+        {
+            "resourceinstanceid": "486412dd-fed8-45b4-a0e0-5cd738f0eaeb",
+            "aliased_data": {
+                "datatypes_1": {
+                    "tileid": "8368dbc8-7cbc-4080-8623-46c928f011b8",
+                    "resourceinstance": "486412dd-fed8-45b4-a0e0-5cd738f0eaeb",
+                    "nodegroup": "c8d6ae9b-d9e4-4ecc-87ef-6183d84df305",
+                    "parenttile": null,
+                    "aliased_data": {
+                        "string": {
+                            "display_value": "forty-two",
+                            "interchange_value": {
+                                "en": {
+                                    "value": "forty-two",
+                                    "direction": "ltr"
+                                }
+                            }
+                        },
+                        "number": {
+                            "display_value": "42",
+                            "interchange_value": 42
+                        },
+                        "concept": {
+                            "display_value": "Arches",
+                            "interchange_value": {
+                                "concept_id": "00000000-0000-0000-0000-000000000001",
+                                "language_id": "en",
+                                "value": "Arches",
+                                "valueid": "d8c60bf4-e786-11e6-905a-b756ec83dad5",
+                                "valuetype_id": "prefLabel"
+                            }
+                        },
+                        ...
+```
+</details>
+- At the bottom of the page, switch to the JSON view to edit the payload and save back. (You can also provide interchange
+values directly rather than wrapping them under an `interchange_value` key.)
+- The schema for the interchange value is [tested here](https://github.com/archesproject/arches-querysets/blob/main/tests/test_datatypes.py).
+- Inherit from the [generic views](https://github.com/archesproject/arches-querysets/blob/main/arches_querysets/rest_framework/generic_views.py) when composing your own routes to customize pagination, permissions, validation etc.
+
+#### Direct QuerySet usage
+This graph has nodes with aliases for each datatype, e.g. "string", with node values all referencing the number 42 in some way:
+
+```py
+In [1]: from pprint import pprint
+
+In [2]: objects = ResourceTileTree.get_tiles(graph_slug="datatype_lookups")
+
+In [3]: for result in objects.filter(string__any_lang_contains='two'):
+    ...:     pprint(result)
+    ...:     pprint(result.aliased_data.datatypes_1.aliased_data)
+
+<ResourceTileTree: Datatype Lookups: Resource referencing 42 (486412dd-fed8-45b4-a0e0-5cd738f0eaeb)>
+AliasedData(string={'en': {'direction': 'ltr', 'value': 'forty-two'}},
+            number=42,
+            concept=<Value: Value object (d8c60bf4-e786-11e6-905a-b756ec83dad5)>,
+            concept_list=[<Value: Value object (d8c60bf4-e786-11e6-905a-b756ec83dad5)>],
+            date='2042-04-02',
+            edtf=None,
+            annotation=None,
+            url={'url': 'http://www.42.com/', 'url_label': '42.com'},
+            resource_instance=<ResourceInstance: Datatype Lookups: Resource referencing 42 (486412dd-fed8-45b4-a0e0-5cd738f0eaeb)>,
+            resource_instance_list=[<ResourceInstance: Datatype Lookups: Resource referencing 42 (486412dd-fed8-45b4-a0e0-5cd738f0eaeb)>],
+            boolean=True,
+            domain_value=None,
+            domain_value_list=None,
+            non_localized_string='forty-two',
+            geojson_feature_collection=None,
+            file_list=[{'accepted': True,
+                        'altText': {'en': {'direction': 'ltr',
+                                           'value': 'Illustration of recent '
+                                                    'accessibility '
+                                                    'improvements'}},
+                        'attribution': {'en': {'direction': 'ltr',
+                                               'value': 'Arches'}},
+                        'content': 'blob:http://localhost:8000/8cf874b3-d84d-4e45-bd32-419dc2fcedeb',
+                        'description': {'en': {'direction': 'ltr',
+                                               'value': 'Recent versions of '
+                                                        'arches have 42 '
+                                                        'improved '
+                                                        'accessibility '
+                                                        'characteristics.'}},
+                        'file_id': '11e5c7d2-6e31-4a7a-af74-25e6064ab40c',
+                        'height': 2042,
+                        'index': 0,
+                        'lastModified': 1723503486969,
+                        'name': '42_accessibility_improvements.png',
+                        'size': 2042,
+                        'status': 'added',
+                        'title': {'en': {'direction': 'ltr',
+                                         'value': '42 Accessibility '
+                                                  'Improvements'}},
+                        'type': 'image/png',
+                        'url': 'http://www.archesproject.org/blog/static/42.png',
+                        'width': 2042}],
+            node_value='8368dbc8-7cbc-4080-8623-46c928f011b8')
+{'en': {'direction': 'ltr', 'value': 'forty-two'}}
+
+In [3]: result.aliased_data.datatypes_1.aliased_data.string = 'new value'
+
+In [4]: result.save()
 ```
 
 ### How would this help an Arches developer?

@@ -27,9 +27,11 @@ classifiers = [
 requires-python = ">=3.10"
 dependencies = [
     "arches>=7.6.12,<8.1.0,!=8.0.0",
-    "djangorestframework==3.16.0",
 ]
 version = "0.2.0-dev"
+
+[project.optional-dependencies]
+drf = ["djangorestframework~=3.16"]
 
 [project.urls]
 Homepage = "https://archesproject.org/"
