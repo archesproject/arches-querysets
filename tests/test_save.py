@@ -1,4 +1,4 @@
-from arches_querysets.models import SemanticResource
+from arches_querysets.models import ResourceTileTree
 from tests.utils import GraphTestCase
 
 
@@ -6,7 +6,7 @@ class SaveTileTests(GraphTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        resources = SemanticResource.as_model(
+        resources = ResourceTileTree.get_tiles(
             "datatype_lookups", as_representation=True
         )
         cls.semantic_resource_42 = resources.get(pk=cls.resource_42.pk)
