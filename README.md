@@ -225,7 +225,7 @@ Factors differentiating the arches-querysets approach include:
 
 As the API stabilizes, elements may be proposed for inclusion in archesproject/arches as ready.
 
-The initial goal is for the first release to support both Arches 7.6 and 8.0.
+The first version supports both Arches 7.6 and 8.0.
 
 ### Contributing
 
