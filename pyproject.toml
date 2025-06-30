@@ -28,7 +28,7 @@ requires-python = ">=3.10"
 dependencies = [
     "arches>=7.6.12,<8.1.0,!=8.0.0",
 ]
-version = "1.0.0b0"
+version = "1.0.0b1-dev"
 
 [project.optional-dependencies]
 drf = ["djangorestframework~=3.16"]
