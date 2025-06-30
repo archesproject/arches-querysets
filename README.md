@@ -8,7 +8,7 @@ Please see the [project page](http://archesproject.org/) for more information on
 ### Installation
 The optional API integration with Django REST Framework is included below.
 
-`pip install arches-querysets[drf]`, or, in pyproject.toml:
+`pip install 'arches-querysets[drf]'`, or, in pyproject.toml:
 ```
 dependencies = [
     ...
