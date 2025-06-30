@@ -159,7 +159,7 @@ AliasedData(string={'en': {'direction': 'ltr', 'value': 'forty-two'}},
 
 In [3]: result.aliased_data.datatypes_1.aliased_data.string = 'new value'
 
-In [4]: result.save()
+In [4]: result.save(index=False)  # indexing avoided purely for 7.6/8.0 test data compat
 ```
 
 ### How would this help an Arches developer?
