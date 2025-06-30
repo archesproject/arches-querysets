@@ -214,7 +214,7 @@ Factors differentiating the arches-querysets approach include:
     - can leverage other built-in Django features:
         - pagination
         - migrations
-        - admin
+        - registering custom SQL lookups
 - Reduce drift against core Arches development: validation traffic still routed through core arches
 - Fully dynamic:
     - does not require declaring "well-known" models
