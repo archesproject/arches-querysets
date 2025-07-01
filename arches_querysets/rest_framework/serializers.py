@@ -406,10 +406,11 @@ class ArchesTileSerializer(serializers.ModelSerializer, NodeFetcherMixin):
     def to_representation(self, data):
         """Prevent newly minted blank tiles from serializing with pk's."""
         ret = super().to_representation(data)
-        if data._state.adding:
-            ret["tileid"] = None
-        if data.parenttile_id and data.parenttile._state.adding:
-            ret["parenttile"] = None
+        if isinstance(data, TileTree):
+            if data._state.adding:
+                ret["tileid"] = None
+            if data.parenttile_id and data.parenttile._state.adding:
+                ret["parenttile"] = None
         return ret
 
     def get_default_field_names(self, declared_fields, model_info):
