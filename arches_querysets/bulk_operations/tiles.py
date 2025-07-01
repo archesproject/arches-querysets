@@ -91,10 +91,10 @@ class TileTreeOperation:
                 if node.pk == node.nodegroup_id:
                     lookup[node.pk] = node
         elif isinstance(self.entry, TileTree):
-            # TODO: look into whether this is repetitive.
             for nodegroup in self.nodegroups:
                 if arches_version >= (8, 0):
-                    lookup[nodegroup.pk] = nodegroup.grouping_node
+                    if nodegroup.grouping_node in self.entry._permitted_nodes:
+                        lookup[nodegroup.pk] = nodegroup.grouping_node
                 else:
                     for node in nodegroup.node_set.all():
                         if (
