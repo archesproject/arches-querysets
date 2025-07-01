@@ -63,7 +63,7 @@ class SaveTileTests(GraphTestCase):
     def test_cardinality_error(self):
         with self.assertRaises(ValidationError) as ctx:
             TileTree.objects.create(
-                nodegroup=self.nodegroup_1, resourceinstance=self.resource_42
+                nodegroup=self.nodegroup_1, resourceinstance=self.resource_42, data={}
             )
         self.assertEqual(
             ctx.exception.message_dict, {"datatypes_1": ["Tile Cardinality Error"]}
