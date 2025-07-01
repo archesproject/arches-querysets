@@ -1,3 +1,5 @@
+from django.core.exceptions import ValidationError
+
 from arches_querysets.models import ResourceTileTree, TileTree
 from tests.utils import GraphTestCase
 
@@ -57,3 +59,12 @@ class SaveTileTests(GraphTestCase):
         msg = "Attempted to append to a populated cardinality-1 nodegroup"
         with self.assertRaisesMessage(RuntimeError, msg):
             self.resource_none.append_tile("datatypes_1")
+
+    def test_cardinality_error(self):
+        with self.assertRaises(ValidationError) as ctx:
+            TileTree.objects.create(
+                nodegroup=self.nodegroup_1, resourceinstance=self.resource_42
+            )
+        self.assertEqual(
+            ctx.exception.message_dict, {"datatypes_1": ["Tile Cardinality Error"]}
+        )
