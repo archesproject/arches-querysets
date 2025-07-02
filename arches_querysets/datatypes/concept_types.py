@@ -28,13 +28,11 @@ class ConceptDataType(concept_types.ConceptDataType):
         return JSONSerializer().serialize(instance)
 
     def get_instance(self, value):
-        if value is None:
-            return None
         try:
-            value = uuid.UUID(value)
-        except (TypeError, ValueError):
-            pass
-        return self.get_value(value)
+            value = uuid.UUID(str(value))
+            return self.get_value(value)
+        except:
+            return None
 
     def get_interchange_value(self, value, *, details=None, **kwargs):
         if not value:
@@ -78,10 +76,10 @@ class ConceptListDataType(concept_types.ConceptListDataType):
         new_values = []
         for inner_value in value or []:
             try:
-                new_val = self.get_value(uuid.UUID(inner_value))
-            except (TypeError, ValueError):
-                new_val = self.get_value(inner_value)
-            new_values.append(new_val)
+                new_val = self.get_value(uuid.UUID(str(inner_value)))
+                new_values.append(new_val)
+            except:
+                pass
         return new_values
 
     def get_interchange_value(self, value, *, details=None, **kwargs):
