@@ -1,3 +1,4 @@
+import uuid
 from functools import lru_cache, partial
 
 from django.conf import settings
@@ -340,14 +341,8 @@ class TileAliasedDataSerializer(serializers.ModelSerializer, NodeFetcherMixin):
 
         ret = self.build_standard_field(field_name, model_field)
         ret[1]["required"] = node.isrequired
-        try:
-            ret[1]["initial"] = config.serialize().get("defaultValue", {})
-        except KeyError:
-            pass
-        try:
-            ret[1]["help_text"] = config.serialize().get("placeholder")
-        except KeyError:
-            pass
+        ret[1]["initial"] = config.serialize().get("defaultValue")
+        ret[1]["help_text"] = config.serialize().get("placeholder")
         ret[1]["label"] = label.serialize()
         ret[1]["style"] = {
             "alias": node.alias,
@@ -375,6 +370,8 @@ class TileAliasedDataSerializer(serializers.ModelSerializer, NodeFetcherMixin):
 
 
 class ArchesTileSerializer(serializers.ModelSerializer, NodeFetcherMixin):
+    # These fields are declared here in full instead of massaged via
+    # "extra_kwargs" in class Meta to support subclassing by TileAliasedDataSerializer.
     tileid = serializers.UUIDField(validators=[], required=False, allow_null=True)
     resourceinstance = serializers.PrimaryKeyRelatedField(
         queryset=ResourceTileTree.objects.all(), required=False, html_cutoff=0
@@ -446,37 +443,8 @@ class ArchesTileSerializer(serializers.ModelSerializer, NodeFetcherMixin):
 
 
 class ArchesResourceSerializer(serializers.ModelSerializer, NodeFetcherMixin):
-    # aliased_data is the only "virtual" field we need to add here, the rest
-    # are inferred by serializers.ModelSerializer. We temporarily define
-    # several fields here to set read_only=True until we can depend on Arches
-    # 8.1 where the model fields set the equivalent editable=False.
+    # aliased_data is a virtual field not inferred by serializers.ModelSerializer.
     aliased_data = ResourceAliasedDataSerializer(required=False, allow_null=False)
-    principaluser = serializers.PrimaryKeyRelatedField(
-        allow_null=True,
-        required=False,
-        read_only=True,
-    )
-    name = serializers.JSONField(
-        allow_null=True,
-        required=False,
-        read_only=True,
-        encoder=JSONSerializer,
-    )
-    descriptors = serializers.JSONField(
-        allow_null=True,
-        required=False,
-        read_only=True,
-    )
-    legacyid = serializers.PrimaryKeyRelatedField(
-        allow_null=True,
-        required=False,
-        read_only=True,
-    )
-    graph_publication = serializers.PrimaryKeyRelatedField(
-        allow_null=True,
-        required=False,
-        read_only=True,
-    )
 
     class Meta:
         model = ResourceTileTree
@@ -484,6 +452,20 @@ class ArchesResourceSerializer(serializers.ModelSerializer, NodeFetcherMixin):
         graph_slug = None
         nodegroups = "__all__"
         fields = "__all__"
+        # Until Arches 8.1 sets the equivalent editable=False on these fields,
+        # mark them read-only.
+        read_only_fields = (
+            "principaluser",
+            "name",
+            "descriptors",
+            "legacyid",
+            "graph_publication",
+            "resource_instance_lifecycle_state",
+        )
+        extra_kwargs = {
+            "resourceinstanceid": {"initial": uuid.uuid4, "allow_null": True},
+            "graph": {"allow_null": True},
+        }
 
     def build_relational_field(self, field_name, relation_info):
         ret = super().build_relational_field(field_name, relation_info)
