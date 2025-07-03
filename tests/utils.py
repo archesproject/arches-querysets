@@ -173,7 +173,14 @@ class GraphTestCase(TestCase):
                     cls.default_vals_by_datatype[widget.node.datatype]
                 )
             else:
-                cls.default_vals_by_nodeid[str(widget.node.pk)] = None
+                for datatype in cls.datatypes:
+                    if datatype.pk == widget.node.datatype:
+                        nodeid = str(widget.node.pk)
+                        config = datatype.defaultwidget.defaultconfig
+                        cls.default_vals_by_nodeid[nodeid] = config.get("defaultValue")
+                        break
+                else:
+                    raise RuntimeError("Missing datatype")
             if arches_version < (8, 0):
                 widget.save()
         if arches_version >= (8, 0):
