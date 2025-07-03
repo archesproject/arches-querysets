@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from django.core.exceptions import ValidationError
 
 from arches_querysets.models import ResourceTileTree, TileTree
@@ -19,6 +21,14 @@ class SaveTileTests(GraphTestCase):
         cls.datatype_1_none = cls.resource_none.aliased_data.datatypes_1
         cls.datatype_n_none = cls.resource_none.aliased_data.datatypes_n
 
+    def assert_default_values_present(self, resource):
+        for node_id_str, value in resource.aliased_data.datatypes_1.data.items():
+            node = [node for node in self.nodes if str(node.pk) == node_id_str][0]
+            with self.subTest(alias=node.alias):
+                default_value = self.default_vals_by_nodeid[node_id_str]
+                expected = TileTree.get_cleaned_default_value(node, default_value)
+                self.assertEqual(value, expected)
+
     def test_blank_tile_save_with_defaults(self):
         # Existing tiles with `None`'s should not be updated with defaults during save
         self.resource_none.save()
@@ -32,8 +42,7 @@ class SaveTileTests(GraphTestCase):
         self.resource_42.fill_blanks()
         # Saving a blank tile should populate default values if defaults are defined.
         self.resource_42.save(index=False)
-        for nodeid, value in self.resource_42.aliased_data.datatypes_1.data.items():
-            self.assertEqual(value, self.default_vals_by_nodeid[nodeid])
+        self.assert_default_values_present(self.resource_42)
 
         # fill_blanks gives an unsaved empty tile, but we also need to test that inserting
         # a tile (ie from the frontend) will fill defaults if no values are provided
@@ -46,9 +55,7 @@ class SaveTileTests(GraphTestCase):
             self.resource_42.aliased_data.datatypes_1.data[node] = None
         # Save should stock defaults
         self.resource_42.aliased_data.datatypes_1.save(index=False)
-
-        for nodeid, value in self.resource_42.aliased_data.datatypes_1.data.items():
-            self.assertEqual(value, self.default_vals_by_nodeid[nodeid])
+        self.assert_default_values_present(self.resource_42)
 
     def test_fill_blanks(self):
         self.resource_none.tilemodel_set.all().delete()
