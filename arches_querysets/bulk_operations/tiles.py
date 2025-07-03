@@ -15,7 +15,6 @@ from arches.app.models.models import (
     Language,
     Node,
     TileModel,
-    ResourceInstance,
 )
 from arches.app.models.tile import Tile, TileValidationError
 
@@ -32,7 +31,7 @@ NOT_PROVIDED = object()
 
 
 class TileTreeOperation:
-    def __init__(self, *, entry, request=None, save_kwargs=None):
+    def __init__(self, *, entry, request=None):
         self.to_insert = set()
         self.to_update = set()
         self.to_delete = set()
@@ -46,7 +45,6 @@ class TileTreeOperation:
         if not getattr(self.request, "user", None):
             # Allow server-side usage when not going through middlewrae
             self.request.user = User.objects.get(username="anonymous")
-        self.save_kwargs = save_kwargs or {}
         self.transaction_id = uuid.uuid4()
         # Store off these properties since they are expensive.
         # self.viewable_nodegroups: set[str] = self.request.user.userprofile.viewable_nodegroups
@@ -251,6 +249,7 @@ class TileTreeOperation:
                     delete_siblings=True,
                 )
             self._validate_and_patch_incoming_values(tile, nodes=nodes)
+            tile.set_missing_keys_to_none()
 
         for tile in to_insert | to_update:
             # Remove no-op upserts.
@@ -280,7 +279,7 @@ class TileTreeOperation:
         return pairs
 
     def _validate_and_patch_incoming_values(self, tile, *, nodes):
-        """Validate data found on ._incoming_tile and move it to .data.
+        """Validate data found on tile._incoming_tile and move it to tile.data.
         Update errors_by_node_alias in place."""
         from arches_querysets.models import AliasedData, TileTree
 
@@ -440,15 +439,11 @@ class TileTreeOperation:
             if self.to_update:
                 TileModel.objects.bulk_update(
                     self.to_update,
+                    # No updates to resource instance or nodegroup.
                     {"data", "parenttile", "provisionaledits", "sortorder"},
                 )
             if self.to_delete:
                 TileModel.objects.filter(pk__in=[t.pk for t in self.to_delete]).delete()
-
-            if isinstance(self.entry, ResourceInstance):
-                self.entry.save_without_aliased_data(**self.save_kwargs)
-            else:
-                self.entry.dummy_save(**self.save_kwargs)
 
             for upsert_tile in upserts:
                 if arches_version < (8, 0):

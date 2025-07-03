@@ -93,6 +93,7 @@ class ResourceTileTree(ResourceInstance):
 
     def save(self, *, request=None, index=True, **kwargs):
         with transaction.atomic():
+            super().save(**kwargs)
             self._save_aliased_data(request=request, index=index, **kwargs)
 
     @classmethod
@@ -146,9 +147,6 @@ class ResourceTileTree(ResourceInstance):
             user=user, edit_type=edit_type, transaction_id=transaction_id
         )
 
-    def save_without_aliased_data(self, **kwargs):
-        return super().save(**kwargs)
-
     def refresh_from_db(self, using=None, fields=None, from_queryset=None, user=None):
         del self._tile_trees
         if from_queryset is None:
@@ -178,7 +176,7 @@ class ResourceTileTree(ResourceInstance):
 
     def _save_aliased_data(self, *, request=None, index=True, **kwargs):
         """Raises a compound ValidationError with any failing tile values."""
-        operation = TileTreeOperation(entry=self, request=request, save_kwargs=kwargs)
+        operation = TileTreeOperation(entry=self, request=request)
         operation.validate_and_save_tiles()
 
         # Instantiate proxy model for now, but refactor & expose this on vanilla model
@@ -244,6 +242,7 @@ class TileTree(TileModel):
             )
         request = request or self._request
         with transaction.atomic():
+            # Mimic some computations trapped on TileModel.save().
             if self.sortorder is None or self.is_fully_provisional():
                 self.set_next_sort_order()
             self._save_aliased_data(request=request, index=index, **kwargs)
@@ -331,7 +330,7 @@ class TileTree(TileModel):
         if self.nodegroup_id and hasattr(self.nodegroup, "grouping_node"):
             return self.nodegroup.grouping_node.alias
         if not getattr(self, "_nodegroup_alias", None):
-            self._nodegroup_alias = Node.objects.get(pk=self.nodegroup_id).alias
+            self._nodegroup_alias = self.nodegroup.alias if self.nodegroup else None
         return self._nodegroup_alias
 
     @classmethod
@@ -495,15 +494,6 @@ class TileTree(TileModel):
 
         return default_value
 
-    def save_without_aliased_data(self, **kwargs):
-        return super().save(**kwargs)
-
-    def dummy_save(self, **kwargs):
-        """Don't save this tile, but run any other side effects."""
-        # update_fields=set() will abort the save.
-        save_kwargs = {**kwargs, "update_fields": set()}
-        return super().save(**save_kwargs)
-
     def set_aliased_data(self, node, node_value):
         """Format node_value according to the self._as_representation flag and
         set it on self.aliased_data."""
@@ -533,7 +523,7 @@ class TileTree(TileModel):
         setattr(self.aliased_data, node.alias, final_val)
 
     def _save_aliased_data(self, *, request=None, index=True, **kwargs):
-        operation = TileTreeOperation(entry=self, request=request, save_kwargs=kwargs)
+        operation = TileTreeOperation(entry=self, request=request)
         operation.validate_and_save_tiles()
 
         proxy_resource = Resource.objects.get(pk=self.resourceinstance_id)
