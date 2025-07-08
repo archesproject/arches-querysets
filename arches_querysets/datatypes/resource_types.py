@@ -6,9 +6,8 @@ from itertools import chain
 from arches import VERSION as arches_version
 from arches.app.datatypes import datatypes
 from arches.app.models import models
-
-from django.utils.translation import get_language, gettext as _
-
+from django.utils.translation import get_language
+from django.utils.translation import gettext as _
 
 logger = logging.getLogger(__name__)
 
@@ -85,10 +84,18 @@ class ResourceInstanceDataType(datatypes.ResourceInstanceDataType):
         if not value:
             return []
         related_resources = []
-        if arches_version >= (8, 0):
-            relations = tile.resourceinstance.from_resxres.all()
+
+        if not isinstance(tile, models.TileModel):
+            tile_model = models.TileModel.objects.get(pk=tile["tileid"])
         else:
-            relations = tile.resourceinstance.resxres_resource_instance_ids_from.all()
+            tile_model = tile
+
+        if arches_version >= (8, 0):
+            relations = tile_model.resourceinstance.from_resxres.all()
+        else:
+            relations = (
+                tile_model.resourceinstance.resxres_resource_instance_ids_from.all()
+            )
 
         def handle_missing_data(to_resource_id):
             msg = f"Missing ResourceXResource target: {to_resource_id}"
