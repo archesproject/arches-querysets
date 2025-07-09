@@ -86,16 +86,12 @@ class ResourceInstanceDataType(datatypes.ResourceInstanceDataType):
         related_resources = []
 
         if not isinstance(tile, models.TileModel):
-            tile_model = models.TileModel.objects.get(pk=tile["tileid"])
-        else:
-            tile_model = tile
+            tile = models.TileModel(**tile)
 
         if arches_version >= (8, 0):
-            relations = tile_model.resourceinstance.from_resxres.all()
+            relations = tile.resourceinstance.from_resxres.all()
         else:
-            relations = (
-                tile_model.resourceinstance.resxres_resource_instance_ids_from.all()
-            )
+            relations = tile.resourceinstance.resxres_resource_instance_ids_from.all()
 
         def handle_missing_data(to_resource_id):
             msg = f"Missing ResourceXResource target: {to_resource_id}"
