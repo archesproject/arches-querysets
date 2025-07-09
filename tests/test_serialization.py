@@ -3,7 +3,7 @@ import uuid
 from arches.app.models.models import Node, TileModel
 from arches.app.utils.betterJSONSerializer import JSONDeserializer, JSONSerializer
 from arches_querysets.models import ResourceTileTree
-from tests.utils import GraphTestCase
+from arches_querysets.utils.tests import GraphTestCase
 
 
 class SerializationTests(GraphTestCase):

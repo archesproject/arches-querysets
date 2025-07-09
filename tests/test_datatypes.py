@@ -1,7 +1,7 @@
 import json
 
 from arches_querysets.models import ResourceTileTree
-from tests.utils import GraphTestCase
+from arches_querysets.utils.tests import GraphTestCase
 
 
 class DatatypeRepresentationTests(GraphTestCase):

@@ -1,7 +1,7 @@
 from django.core.exceptions import ValidationError
 
 from arches_querysets.models import ResourceTileTree, TileTree
-from tests.utils import GraphTestCase
+from arches_querysets.utils.tests import GraphTestCase
 
 
 class SaveTileTests(GraphTestCase):
