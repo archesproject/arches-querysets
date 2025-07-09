@@ -1,5 +1,5 @@
 from arches_querysets.models import TileTree
-from tests.utils import GraphTestCase
+from arches_querysets.utils.tests import GraphTestCase
 
 
 class InternalsTests(GraphTestCase):

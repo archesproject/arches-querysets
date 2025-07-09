@@ -3,7 +3,7 @@ from http import HTTPStatus
 from django.core.management import call_command
 from django.urls import reverse
 
-from tests.utils import GraphTestCase
+from arches_querysets.utils.tests import GraphTestCase
 
 
 class RestFrameworkTests(GraphTestCase):

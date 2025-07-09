@@ -1,6 +1,6 @@
 from arches_querysets.datatypes import DataTypeFactory
 from arches_querysets.models import GraphWithPrefetching, ResourceTileTree
-from tests.utils import GraphTestCase
+from arches_querysets.utils.tests import GraphTestCase
 
 
 class PerformanceTests(GraphTestCase):
