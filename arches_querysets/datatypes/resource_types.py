@@ -22,7 +22,7 @@ class ResourceInstanceDataType(datatypes.ResourceInstanceDataType):
             for graph_config in kwargs.get("graphs", [])
         }
 
-        if isinstance(parsed, (str, dict)):
+        if isinstance(parsed, (str, dict, models.ResourceInstance)):
             parsed = [parsed]
         if isinstance(parsed, list):
             transformed = []
@@ -50,13 +50,7 @@ class ResourceInstanceDataType(datatypes.ResourceInstanceDataType):
                     case _:
                         transformed.append(inner_val)
             return transformed
-        if isinstance(parsed, models.ResourceInstance):
-            return [
-                self.from_id_string(
-                    str(parsed.pk),
-                    graph_configs_by_graph_id.get(parsed.graph_id),
-                )
-            ]
+
         return parsed
 
     def get_resource(self, tile):
