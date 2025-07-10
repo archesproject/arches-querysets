@@ -38,6 +38,7 @@ from arches_querysets.querysets import (
 )
 from arches_querysets.utils.models import (
     append_tiles_recursively,
+    ensure_request,
     get_recursive_prefetches,
     get_nodegroups_here_and_below,
     pop_arches_model_kwargs,
@@ -51,8 +52,8 @@ class AliasedData(SimpleNamespace):
     """Provides dot access into node values and nested nodegroups by alias.
 
     >>> ResourceTileTree.get_tiles('new_resource_model_1').get(...).aliased_data
-    namespace(string_node={'en': {'value': 'abcde', 'direction': 'ltr'}},
-          child_node=<TileTree: child_node (c3637412-9b13-4f05-8f4a-5a80560b8b6e)>)
+    AliasedData(string_node={'en': {'value': 'abcde', 'direction': 'ltr'}},
+                child_node=<TileTree: child_node (c3637412-9b13-4f05-8f4a-5a80560b8b6e)>)
     """
 
     def serialize(self, **kwargs):
@@ -91,8 +92,8 @@ class ResourceTileTree(ResourceInstance):
     def aliased_data(self, value):
         self._aliased_data = value
 
-    def save(self, *, request=None, index=True, **kwargs):
-        self._save_aliased_data(request=request, index=index, **kwargs)
+    def save(self, *, request=None, index=True, force_admin=False, **kwargs):
+        self._save_aliased_data(request=request, index=index, force_admin=force_admin, **kwargs)
 
     @classmethod
     def get_tiles(
@@ -172,8 +173,11 @@ class ResourceTileTree(ResourceInstance):
             self.aliased_data = db_instance.aliased_data
             self._tile_trees = from_queryset[0]._tile_trees
 
-    def _save_aliased_data(self, *, request=None, index=True, **kwargs):
+    def _save_aliased_data(
+        self, *, request=None, index=True, force_admin=False, **kwargs
+    ):
         """Raises a compound ValidationError with any failing tile values."""
+        request = ensure_request(request, force_admin)
         operation = TileTreeOperation(entry=self, request=request, save_kwargs=kwargs)
         operation.validate_and_save_tiles()
 
@@ -235,7 +239,7 @@ class TileTree(TileModel):
     def resource_or_none(self):
         return self.resourceinstance if self.resourceinstance_id else None
 
-    def save(self, *, request=None, index=True, **kwargs):
+    def save(self, *, request=None, index=True, force_admin=False, **kwargs):
         if arches_version < (8, 0) and self.nodegroup:
             # Cannot supply this too early, as nodegroup might be included
             # with the request and already instantiated to a fresh object.
@@ -246,7 +250,7 @@ class TileTree(TileModel):
         # Mimic some computations trapped on TileModel.save().
         if self.sortorder is None or self.is_fully_provisional():
             self.set_next_sort_order()
-        self._save_aliased_data(request=request, index=index, **kwargs)
+        self._save_aliased_data(request=request, index=index, force_admin=force_admin, **kwargs)
 
     @classmethod
     def get_tiles(
@@ -338,8 +342,8 @@ class TileTree(TileModel):
     def deserialize(cls, tile_dict, parent_tile: TileModel | None):
         """
         If you're not using the Django REST Framework optional dependency,
-        e.g. if you request an evaluate a queryset with as_representation=True and
-        resave the instance, you'll need a way to deserialize dicts into TileTrees.
+        e.g. if you evaluate a queryset with as_representation=True and resave
+        the instance, you'll need a way to deserialize dicts into TileTrees.
         """
         if not isinstance(tile_dict, Mapping):
             raise TypeError(
@@ -542,7 +546,8 @@ class TileTree(TileModel):
 
         setattr(self.aliased_data, node.alias, final_val)
 
-    def _save_aliased_data(self, *, request=None, index=True, **kwargs):
+    def _save_aliased_data(self, *, request=None, index=True, force_admin=False, **kwargs):
+        request = ensure_request(request, force_admin)
         operation = TileTreeOperation(entry=self, request=request, save_kwargs=kwargs)
         operation.validate_and_save_tiles()
 
