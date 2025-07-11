@@ -1,6 +1,7 @@
 import json
 
 from arches_querysets.models import ResourceTileTree
+from arches_querysets.datatypes.datatypes import DataTypeFactory
 from tests.utils import GraphTestCase
 
 
@@ -162,3 +163,62 @@ class DatatypePythonTests(GraphTestCase):
                     self.assertEqual(value, python_value)
                     value = getattr(resource_data_none, lookup)
                     self.assertIsNone(value, datatype)
+
+    def test_transform_value_for_tile(self):
+        # Test that the transformation of values for tile works correctly.
+        df = DataTypeFactory()
+        test_values = {
+            # TODO - add more datatypes tests here.
+            "resource-instance": {
+                "input": self.resource_42.pk, # test as uuid
+                "output": [{
+                    "resourceId": str(self.resource_42.pk),
+                    "ontologyProperty": "",
+                    "inverseOntologyProperty": "",
+                }],
+            },
+            "resource-instance": {
+                "input": str(self.resource_42.pk), # test as string
+                "output": [{
+                    "resourceId": str(self.resource_42.pk),
+                    "ontologyProperty": "",
+                    "inverseOntologyProperty": "",
+                }],
+            },
+            "resource-instance": {
+                "input": self.resource_42, # test as model instance
+                "output": [{
+                    "resourceId": str(self.resource_42.pk),
+                    "ontologyProperty": "",
+                    "inverseOntologyProperty": "",
+                }],
+            },
+            "resource-instance": {
+                "input": { # test as dict
+                    "resourceId": str(self.resource_42.pk),
+                    "ontologyProperty": "testProperty",
+                    "inverseOntologyProperty": "testInverseProperty",
+                },
+                "output": [{
+                    "resourceId": str(self.resource_42.pk),
+                    "ontologyProperty": "testProperty",
+                    "inverseOntologyProperty": "testInverseProperty",
+                }],
+            },
+            "resource-instance-list": {
+                "input": [self.resource_42.pk],
+                "output": [{
+                    "resourceId": str(self.resource_42.pk),
+                    "ontologyProperty":  "",
+                    "inverseOntologyProperty": "",
+                }],
+            },
+        }
+
+        for datatype, value in test_values.items():
+            # import ipdb; ipdb.sset_trace()
+            
+            with self.subTest():
+                datatype_instance = df.get_instance(datatype=datatype)
+                transformed_value = datatype_instance.transform_value_for_tile(value["input"])
+                self.assertEqual(transformed_value, value["output"])
