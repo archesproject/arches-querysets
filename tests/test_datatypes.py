@@ -1,7 +1,6 @@
 import json
 
 from arches_querysets.models import ResourceTileTree
-from arches_querysets.datatypes.datatypes import DataTypeFactory
 from tests.utils import GraphTestCase
 
 
@@ -164,9 +163,10 @@ class DatatypePythonTests(GraphTestCase):
                     value = getattr(resource_data_none, lookup)
                     self.assertIsNone(value, datatype)
 
+
+class DatatypeMethodTests(GraphTestCase):
     def test_transform_value_for_tile(self):
         # Test that the transformation of values for tile works correctly.
-        df = DataTypeFactory()
         test_values = {
             # TODO - add more datatypes tests here.
             "resource-instance": {
@@ -200,11 +200,15 @@ class DatatypePythonTests(GraphTestCase):
                 ],
             },
             "resource-instance": {
-                "input": json.dumps([{  # test as stringified dict
-                    "resourceId": str(self.resource_42.pk),
-                    "ontologyProperty": "testProperty",
-                    "inverseOntologyProperty": "testInverseProperty",
-                }]),
+                "input": json.dumps(
+                    [
+                        {  # test as stringified dict
+                            "resourceId": str(self.resource_42.pk),
+                            "ontologyProperty": "testProperty",
+                            "inverseOntologyProperty": "testInverseProperty",
+                        }
+                    ]
+                ),
                 "output": [
                     {
                         "resourceId": str(self.resource_42.pk),
@@ -214,11 +218,13 @@ class DatatypePythonTests(GraphTestCase):
                 ],
             },
             "resource-instance": {
-                "input": [{  # test as dict
-                    "resourceId": str(self.resource_42.pk),
-                    "ontologyProperty": "testProperty",
-                    "inverseOntologyProperty": "testInverseProperty",
-                }],
+                "input": [
+                    {  # test as dict
+                        "resourceId": str(self.resource_42.pk),
+                        "ontologyProperty": "testProperty",
+                        "inverseOntologyProperty": "testInverseProperty",
+                    }
+                ],
                 "output": [
                     {
                         "resourceId": str(self.resource_42.pk),
@@ -240,10 +246,10 @@ class DatatypePythonTests(GraphTestCase):
         }
 
         for datatype, value in test_values.items():
-            # import ipdb; ipdb.sset_trace()
-
-            with self.subTest():
-                datatype_instance = df.get_instance(datatype=datatype)
+            with self.subTest(datatype=datatype, value=value["input"]):
+                datatype_instance = self.datatype_factory.get_instance(
+                    datatype=datatype
+                )
                 transformed_value = datatype_instance.transform_value_for_tile(
                     value["input"]
                 )
