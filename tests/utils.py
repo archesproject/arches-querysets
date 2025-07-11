@@ -107,24 +107,12 @@ class GraphTestCase(TestCase):
             *cls.data_nodes,
         ]
 
-        cls.ri_node_1, cls.ri_node_n = [
-            node for node in cls.nodes if node.datatype == "resource-instance"
-        ]
-        cls.ri_list_node_1, cls.ri_list_node_n = [
-            node for node in cls.nodes if node.datatype == "resource-instance-list"
-        ]
-        cls.date_node_1, cls.date_node_n = [
-            node for node in cls.nodes if node.datatype == "date"
-        ]
-        cls.string_node_1, cls.string_node_n = [
-            node for node in cls.nodes if node.datatype == "string"
-        ]
-        cls.node_value_node_1, cls.node_value_node_n = [
-            node for node in cls.nodes if node.datatype == "node-value"
-        ]
-        cls.url_node_1, cls.url_node_n = [
-            node for node in cls.nodes if node.datatype == "url"
-        ]
+        # Set each node as an attribute, e.g. self.string_node_n
+        for node in cls.data_nodes:
+            attname = node.datatype.replace("-", "_")
+            attname += "_node_1" if node.nodegroup.cardinality == "1" else "_node_n"
+            setattr(cls, attname, node)
+
         cls.node_value_node_1.config["nodeid"] = str(cls.date_node_1.pk)
         cls.node_value_node_1.save()
         cls.node_value_node_n.config["nodeid"] = str(cls.date_node_n.pk)
@@ -376,7 +364,7 @@ class GraphTestCase(TestCase):
                     from_graph_attr: cls.graph,
                     to_graph_attr: cls.graph,
                     tile_attr: cls.cardinality_1_tile,
-                    node_attr: cls.ri_node_1,
+                    node_attr: cls.resource_instance_node_1,
                 }
             ),
             ResourceXResource(
@@ -386,7 +374,7 @@ class GraphTestCase(TestCase):
                     from_graph_attr: cls.graph,
                     to_graph_attr: cls.graph,
                     tile_attr: cls.cardinality_n_tile,
-                    node_attr: cls.ri_node_n,
+                    node_attr: cls.resource_instance_node_n,
                 }
             ),
             ResourceXResource(
@@ -396,7 +384,7 @@ class GraphTestCase(TestCase):
                     from_graph_attr: cls.graph,
                     to_graph_attr: cls.graph,
                     tile_attr: cls.cardinality_1_tile,
-                    node_attr: cls.ri_list_node_1,
+                    node_attr: cls.resource_instance_list_node_1,
                 }
             ),
             ResourceXResource(
@@ -406,7 +394,7 @@ class GraphTestCase(TestCase):
                     from_graph_attr: cls.graph,
                     to_graph_attr: cls.graph,
                     tile_attr: cls.cardinality_n_tile,
-                    node_attr: cls.ri_list_node_n,
+                    node_attr: cls.resource_instance_list_node_n,
                 }
             ),
         ]

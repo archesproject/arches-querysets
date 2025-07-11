@@ -1,5 +1,3 @@
-from types import SimpleNamespace
-
 from django.core.exceptions import ValidationError
 
 from arches_querysets.models import ResourceTileTree, TileTree
