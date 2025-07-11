@@ -170,55 +170,67 @@ class DatatypePythonTests(GraphTestCase):
         test_values = {
             # TODO - add more datatypes tests here.
             "resource-instance": {
-                "input": self.resource_42.pk, # test as uuid
-                "output": [{
-                    "resourceId": str(self.resource_42.pk),
-                    "ontologyProperty": "",
-                    "inverseOntologyProperty": "",
-                }],
+                "input": self.resource_42.pk,  # test as uuid
+                "output": [
+                    {
+                        "resourceId": str(self.resource_42.pk),
+                        "ontologyProperty": "",
+                        "inverseOntologyProperty": "",
+                    }
+                ],
             },
             "resource-instance": {
-                "input": str(self.resource_42.pk), # test as string
-                "output": [{
-                    "resourceId": str(self.resource_42.pk),
-                    "ontologyProperty": "",
-                    "inverseOntologyProperty": "",
-                }],
+                "input": str(self.resource_42.pk),  # test as string
+                "output": [
+                    {
+                        "resourceId": str(self.resource_42.pk),
+                        "ontologyProperty": "",
+                        "inverseOntologyProperty": "",
+                    }
+                ],
             },
             "resource-instance": {
-                "input": self.resource_42, # test as model instance
-                "output": [{
-                    "resourceId": str(self.resource_42.pk),
-                    "ontologyProperty": "",
-                    "inverseOntologyProperty": "",
-                }],
+                "input": self.resource_42,  # test as model instance
+                "output": [
+                    {
+                        "resourceId": str(self.resource_42.pk),
+                        "ontologyProperty": "",
+                        "inverseOntologyProperty": "",
+                    }
+                ],
             },
             "resource-instance": {
-                "input": { # test as dict
+                "input": {  # test as dict
                     "resourceId": str(self.resource_42.pk),
                     "ontologyProperty": "testProperty",
                     "inverseOntologyProperty": "testInverseProperty",
                 },
-                "output": [{
-                    "resourceId": str(self.resource_42.pk),
-                    "ontologyProperty": "testProperty",
-                    "inverseOntologyProperty": "testInverseProperty",
-                }],
+                "output": [
+                    {
+                        "resourceId": str(self.resource_42.pk),
+                        "ontologyProperty": "testProperty",
+                        "inverseOntologyProperty": "testInverseProperty",
+                    }
+                ],
             },
             "resource-instance-list": {
                 "input": [self.resource_42.pk],
-                "output": [{
-                    "resourceId": str(self.resource_42.pk),
-                    "ontologyProperty":  "",
-                    "inverseOntologyProperty": "",
-                }],
+                "output": [
+                    {
+                        "resourceId": str(self.resource_42.pk),
+                        "ontologyProperty": "",
+                        "inverseOntologyProperty": "",
+                    }
+                ],
             },
         }
 
         for datatype, value in test_values.items():
             # import ipdb; ipdb.sset_trace()
-            
+
             with self.subTest():
                 datatype_instance = df.get_instance(datatype=datatype)
-                transformed_value = datatype_instance.transform_value_for_tile(value["input"])
+                transformed_value = datatype_instance.transform_value_for_tile(
+                    value["input"]
+                )
                 self.assertEqual(transformed_value, value["output"])
