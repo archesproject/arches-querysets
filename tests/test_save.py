@@ -41,7 +41,7 @@ class SaveTileTests(GraphTestCase):
         self.resource_42.refresh_from_db()
         self.resource_42.fill_blanks()
         # Saving a blank tile should populate default values if defaults are defined.
-        self.resource_42.save(index=False)
+        self.resource_42.save()
         self.assert_default_values_present(self.resource_42)
 
         # fill_blanks gives an unsaved empty tile, but we also need to test that inserting
@@ -54,7 +54,7 @@ class SaveTileTests(GraphTestCase):
         for node in self.resource_42.aliased_data.datatypes_1.data:
             self.resource_42.aliased_data.datatypes_1.data[node] = None
         # Save should stock defaults
-        self.resource_42.aliased_data.datatypes_1.save(index=False)
+        self.resource_42.aliased_data.datatypes_1.save()
         self.assert_default_values_present(self.resource_42)
 
     def test_fill_blanks(self):
