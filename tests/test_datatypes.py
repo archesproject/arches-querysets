@@ -200,11 +200,25 @@ class DatatypePythonTests(GraphTestCase):
                 ],
             },
             "resource-instance": {
-                "input": {  # test as dict
+                "input": json.dumps([{  # test as stringified dict
                     "resourceId": str(self.resource_42.pk),
                     "ontologyProperty": "testProperty",
                     "inverseOntologyProperty": "testInverseProperty",
-                },
+                }]),
+                "output": [
+                    {
+                        "resourceId": str(self.resource_42.pk),
+                        "ontologyProperty": "testProperty",
+                        "inverseOntologyProperty": "testInverseProperty",
+                    }
+                ],
+            },
+            "resource-instance": {
+                "input": [{  # test as dict
+                    "resourceId": str(self.resource_42.pk),
+                    "ontologyProperty": "testProperty",
+                    "inverseOntologyProperty": "testInverseProperty",
+                }],
                 "output": [
                     {
                         "resourceId": str(self.resource_42.pk),
