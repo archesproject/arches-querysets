@@ -11,6 +11,7 @@ omit =
     */hosts.py
     */celery.py
     */__init__.py
+    arches_querysets/management/commands/add_test_data.py
 
 data_file = coverage/python/.coverage
 
