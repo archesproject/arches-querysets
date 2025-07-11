@@ -10,6 +10,7 @@ from arches.app.models.models import (
     CardXNodeXWidget,
     Concept,
     DDataType,
+    Edge,
     Node,
     NodeGroup,
     ResourceInstance,
@@ -28,7 +29,7 @@ class GraphTestCase(TestCase):
         cls.create_graph()
         cls.create_nodegroups_and_grouping_nodes()
         cls.create_data_collecting_nodes()
-        # cls.create_edges() -- edges not fathomed
+        cls.create_edges()
         cls.create_cards()
         cls.create_widgets()
         cls.add_default_values_for_widgets()
@@ -36,13 +37,18 @@ class GraphTestCase(TestCase):
         cls.create_tiles_with_data()
         cls.create_tiles_with_none()
         cls.create_relations()
-        Graph.objects.get(pk=cls.graph.pk).publish(user=None)
+
+        graph_proxy = Graph.objects.get(pk=cls.graph.pk)
+        if arches_version < (8, 0):
+            graph_proxy.refresh_from_database()
+        graph_proxy.publish(user=None)
 
     @classmethod
     def create_graph(cls):
         cls.graph = GraphWithPrefetching.objects.create_graph(
             name="Datatype Lookups", is_resource=True
         )
+        cls.root_node = cls.graph.node_set.get(istopnode=True)
 
     @classmethod
     def create_nodegroup(cls, alias, cardinality, parent_nodegroup=None):
@@ -93,7 +99,13 @@ class GraphTestCase(TestCase):
             )
             for datatype in cls.datatypes
         ]
-        cls.nodes = Node.objects.bulk_create(cls.data_nodes_1 + cls.data_nodes_n)
+        cls.data_nodes = Node.objects.bulk_create(cls.data_nodes_1 + cls.data_nodes_n)
+        cls.nodes = [
+            cls.root_node,
+            cls.grouping_node_1,
+            cls.grouping_node_n,
+            *cls.data_nodes,
+        ]
 
         cls.ri_node_1, cls.ri_node_n = [
             node for node in cls.nodes if node.datatype == "resource-instance"
@@ -117,6 +129,29 @@ class GraphTestCase(TestCase):
         cls.node_value_node_1.save()
         cls.node_value_node_n.config["nodeid"] = str(cls.date_node_n.pk)
         cls.node_value_node_n.save()
+
+    @classmethod
+    def create_edges(cls):
+        def get_node_to_append_to(node):
+            if node.pk == node.nodegroup.pk:
+                return cls.root_node
+            if node.nodegroup == cls.nodegroup_1:
+                return cls.grouping_node_1
+            if node.nodegroup == cls.nodegroup_n:
+                return cls.grouping_node_n
+            raise ValueError
+
+        edges = [
+            Edge(
+                domainnode=get_node_to_append_to(node),
+                rangenode=node,
+                ontologyproperty="",
+                graph=cls.graph,
+            )
+            for node in cls.nodes
+            if node is not cls.root_node
+        ]
+        cls.edges = Edge.objects.bulk_create(edges)
 
     @classmethod
     def create_cards(cls):

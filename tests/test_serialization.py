@@ -32,7 +32,7 @@ class SerializationTests(GraphTestCase):
         )
 
         # Clone nodes.
-        for node in cls.nodes:
+        for node in cls.data_nodes:
             node.pk = uuid.uuid4()
             node.name = node.name + "-child"
             node.alias = node.alias + "_child"
@@ -41,7 +41,7 @@ class SerializationTests(GraphTestCase):
                 if node.nodegroup == cls.nodegroup_1
                 else cls.nodegroup_n_child
             )
-        Node.objects.bulk_create(cls.nodes)
+        Node.objects.bulk_create(cls.data_nodes)
 
         # Create data for the child non-localized-string node only.
         # TileModel.save() will initialize the other nodes to None.
