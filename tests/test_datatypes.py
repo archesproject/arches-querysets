@@ -61,21 +61,22 @@ class DatatypeRepresentationTests(GraphTestCase):
                     value = getattr(resource_data_none, lookup)
                     self.assertEqual(value.get("display_value"), "(Empty)")
 
-    def test_as_representation_interchange_values(self):
-        interchange_values = {
-            # Start with the tile representation.
-            **self.sample_data_1,
-            # Some interchange values are different.
-            # Resource Instance resolves to the pk.
-            "resource-instance": str(self.resource_42.pk),
-            # Resource Instance list resolves to a details array.
+    def test_as_representation_details(self):
+        detail_values = {
+            # Resource Instance & list details both resolve to an array of objects.
+            "resource-instance": [
+                {
+                    "resource_id": str(self.resource_42.pk),
+                    "display_value": self.resource_42.descriptors["en"]["name"],
+                }
+            ],
             "resource-instance-list": [
                 {
                     "resource_id": str(self.resource_42.pk),
                     "display_value": self.resource_42.descriptors["en"]["name"],
                 }
             ],
-            # Concept resolves to a single detail object.
+            # Concept details resolves to a single object.
             "concept": {
                 "valueid": "d8c60bf4-e786-11e6-905a-b756ec83dad5",
                 "concept_id": "00000000-0000-0000-0000-000000000001",
@@ -83,7 +84,7 @@ class DatatypeRepresentationTests(GraphTestCase):
                 "value": "Arches",
                 "language_id": "en",
             },
-            # Concept list resolves to a details array.
+            # Concept list details resolve to an array.
             "concept-list": [
                 {
                     "valueid": "d8c60bf4-e786-11e6-905a-b756ec83dad5",
@@ -95,8 +96,8 @@ class DatatypeRepresentationTests(GraphTestCase):
             ],
         }
 
-        # The interchange value is available on the nodegroup .aliased_data.
-        for datatype, interchange_value in interchange_values.items():
+        # The details are available on the nodegroup .aliased_data.
+        for datatype, details in detail_values.items():
             node_alias = datatype.replace("-", "_")
             for resource_data, resource_data_none, cardinality in [
                 (self.datatype_1.aliased_data, self.datatype_1_none.aliased_data, "1"),
@@ -108,12 +109,13 @@ class DatatypeRepresentationTests(GraphTestCase):
             ]:
                 lookup = node_alias if cardinality == "1" else node_alias + "_n"
                 if lookup == "node_value_n":
-                    interchange_value = self.sample_data_n["node-value"]
+                    details = self.sample_data_n["node-value"]
                 with self.subTest(lookup=lookup):
                     value = getattr(resource_data, lookup)
-                    self.assertEqual(value.get("interchange_value"), interchange_value)
+                    self.assertEqual(value.get("details"), details)
                     value = getattr(resource_data_none, lookup)
-                    self.assertIsNone(value.get("interchange_value"), datatype)
+                    if value.get("details") is not None:
+                        self.assertEqual(value.get("details"), [])
 
 
 class DatatypePythonTests(GraphTestCase):
