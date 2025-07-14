@@ -57,7 +57,7 @@ class RestFrameworkTests(GraphTestCase):
             response.json()["aliased_data"]["string_n"],
             {
                 "display_value": "create_value",
-                "interchange_value": {
+                "node_value": {
                     "en": {"value": "create_value", "direction": "ltr"},
                 },
             },

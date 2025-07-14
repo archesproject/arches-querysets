@@ -74,7 +74,7 @@ Vary: Accept
                     "aliased_data": {
                         "string": {
                             "display_value": "forty-two",
-                            "interchange_value": {
+                            "node_value": {
                                 "en": {
                                     "value": "forty-two",
                                     "direction": "ltr"
@@ -83,25 +83,18 @@ Vary: Accept
                         },
                         "number": {
                             "display_value": "42",
-                            "interchange_value": 42
+                            "node_value": 42
                         },
                         "concept": {
                             "display_value": "Arches",
-                            "interchange_value": {
-                                "concept_id": "00000000-0000-0000-0000-000000000001",
-                                "language_id": "en",
-                                "value": "Arches",
-                                "valueid": "d8c60bf4-e786-11e6-905a-b756ec83dad5",
-                                "valuetype_id": "prefLabel"
-                            }
-                        },
-                        ...
+                            "node_value": "d8c60bf4-e786-11e6-905a-b756ec83dad5",
+                            "details": {
+                                ...
 ```
 </details>
 
-- At the bottom of the page, switch to the JSON view to edit the payload and save back. (You can also provide interchange
-values directly rather than wrapping them under an `interchange_value` key.)
-- The schema for the interchange value is [tested here](https://github.com/archesproject/arches-querysets/blob/main/tests/test_datatypes.py).
+- At the bottom of the page, switch to the JSON view to edit the payload and save back. (You can also provide node
+values directly rather than wrapping them under a `node_value` key.)
 - Inherit from the [generic views](https://github.com/archesproject/arches-querysets/blob/main/arches_querysets/rest_framework/generic_views.py) when composing your own routes to customize pagination, permissions, validation etc.
 
 #### Direct QuerySet usage
