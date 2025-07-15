@@ -68,6 +68,7 @@ class DatatypeRepresentationTests(GraphTestCase):
                 {
                     "resource_id": str(self.resource_42.pk),
                     "display_value": self.resource_42.descriptors["en"]["name"],
+                    # This can be extended as necessary via get_details()
                 }
             ],
             "resource-instance-list": [
@@ -76,15 +77,16 @@ class DatatypeRepresentationTests(GraphTestCase):
                     "display_value": self.resource_42.descriptors["en"]["name"],
                 }
             ],
-            # Concept details resolves to a single object.
-            "concept": {
-                "valueid": "d8c60bf4-e786-11e6-905a-b756ec83dad5",
-                "concept_id": "00000000-0000-0000-0000-000000000001",
-                "valuetype_id": "prefLabel",
-                "value": "Arches",
-                "language_id": "en",
-            },
-            # Concept list details resolve to an array.
+            # Same with concept & concept-list.
+            "concept": [
+                {
+                    "valueid": "d8c60bf4-e786-11e6-905a-b756ec83dad5",
+                    "concept_id": "00000000-0000-0000-0000-000000000001",
+                    "valuetype_id": "prefLabel",
+                    "value": "Arches",
+                    "language_id": "en",
+                }
+            ],
             "concept-list": [
                 {
                     "valueid": "d8c60bf4-e786-11e6-905a-b756ec83dad5",
