@@ -60,6 +60,7 @@ class RestFrameworkTests(GraphTestCase):
                 "node_value": {
                     "en": {"value": "create_value", "direction": "ltr"},
                 },
+                "details": [],
             },
         )
         self.assertEqual(response.status_code, HTTPStatus.CREATED, response.content)
