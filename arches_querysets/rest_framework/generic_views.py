@@ -52,7 +52,7 @@ class ArchesTileDetailView(ArchesModelAPIMixin, RetrieveUpdateDestroyAPIView):
             parsed_data = json.loads(raw_json)
         except ValueError as exc:
             raise ParseError(detail=f"Invalid JSON in 'json' part: {exc}")
-        
+
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=parsed_data, partial=True)
 
