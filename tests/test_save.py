@@ -12,10 +12,14 @@ class SaveTileTests(GraphTestCase):
             "datatype_lookups", as_representation=True
         )
         cls.resource_42 = resources.get(pk=cls.resource_42.pk)
+        cls.resource_42.graph_publication_id = cls.graph.publication_id
+        cls.resource_42.save()
         cls.datatype_1 = cls.resource_42.aliased_data.datatypes_1
         cls.datatype_n = cls.resource_42.aliased_data.datatypes_n
 
         cls.resource_none = resources.get(pk=cls.resource_none.pk)
+        cls.resource_none.graph_publication_id = cls.graph.publication_id
+        cls.resource_none.save()
         cls.datatype_1_none = cls.resource_none.aliased_data.datatypes_1
         cls.datatype_n_none = cls.resource_none.aliased_data.datatypes_n
 
