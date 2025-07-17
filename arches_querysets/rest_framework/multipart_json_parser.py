@@ -27,6 +27,6 @@ class MultiPartJSONParser(MultiPartParser):
             raise ParseError(detail=f"Invalid JSON in 'json' part: {err}")
 
         if not isinstance(decoded, dict):
-            raise ParseError(detail="'json' part did not decode to a JSON object")
+            raise ParseError(detail="'json' part did not decode to a dict")
 
         return DataAndFiles(decoded, file_fields)
