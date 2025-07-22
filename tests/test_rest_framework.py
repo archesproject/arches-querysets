@@ -5,6 +5,7 @@ from django.core.management import call_command
 from django.urls import reverse
 from arches import VERSION as arches_version
 from arches.app.models.graph import Graph
+from arches.app.models.models import EditLog
 
 from arches_querysets.utils.tests import GraphTestCase
 
@@ -18,7 +19,7 @@ class RestFrameworkTests(GraphTestCase):
         cls.resource_42.graph_publication = cls.resource_42.graph.publication
         cls.resource_42.save()
 
-    def test_create_tile_existing_resource(self):
+    def test_create_tile_for_new_resource(self):
         create_url = reverse(
             "api-tiles",
             kwargs={"graph": "datatype_lookups", "nodegroup_alias": "datatypes_n"},
@@ -32,21 +33,8 @@ class RestFrameworkTests(GraphTestCase):
             )
             self.assertEqual(forbidden_response.status_code, HTTPStatus.FORBIDDEN)
 
-        # Dev user can edit ...
+        # Dev user can edit.
         self.client.login(username="dev", password="dev")
-        with self.assertLogs("django.request", level="WARNING"):
-            response = self.client.post(
-                create_url, request_body, content_type="application/json"
-            )
-
-        self.assertJSONEqual(
-            response.content,
-            {"resourceinstance": ["This field cannot be null."]},
-        )
-        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST, response.content)
-
-        # ... if a resource is specified.
-        request_body["resourceinstance"] = str(self.resource_42.pk)
         response = self.client.post(
             create_url, request_body, content_type="application/json"
         )
@@ -64,6 +52,15 @@ class RestFrameworkTests(GraphTestCase):
             },
         )
         self.assertEqual(response.status_code, HTTPStatus.CREATED, response.content)
+
+        self.assertSequenceEqual(
+            EditLog.objects.filter(
+                resourceinstanceid=response.json()["resourceinstance"],
+            )
+            .values_list("edittype", flat=True)
+            .order_by("edittype"),
+            ["create", "tile create"],
+        )
 
     @unittest.skipIf(arches_version < (8, 0), reason="Arches 8+ only logic")
     def test_out_of_date_resource(self):
