@@ -40,6 +40,7 @@ class RestFrameworkTests(GraphTestCase):
         )
 
         # The response includes the context.
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
         self.assertIn("aliased_data", response.json())
         self.assertEqual(
             response.json()["aliased_data"]["string_n"],
@@ -60,6 +61,32 @@ class RestFrameworkTests(GraphTestCase):
             .values_list("edittype", flat=True)
             .order_by("edittype"),
             ["create", "tile create"],
+        )
+
+    def test_create_tile_for_existing_resource(self):
+        create_url = reverse(
+            "api-tiles",
+            kwargs={"graph": "datatype_lookups", "nodegroup_alias": "datatypes_n"},
+        )
+        request_body = {
+            "aliased_data": {"string_n": "create_value"},
+            "resourceinstance": str(self.resource_42.pk),
+        }
+        self.client.login(username="dev", password="dev")
+        response = self.client.post(
+            create_url, request_body, content_type="application/json"
+        )
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        self.assertEqual(response.json()["resourceinstance"], str(self.resource_42.pk))
+        self.assertEqual(
+            response.json()["aliased_data"]["string_n"],
+            {
+                "display_value": "create_value",
+                "node_value": {
+                    "en": {"value": "create_value", "direction": "ltr"},
+                },
+                "details": [],
+            },
         )
 
     @unittest.skipIf(arches_version < (8, 0), reason="Arches 8+ only logic")
