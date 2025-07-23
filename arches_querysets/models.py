@@ -282,12 +282,6 @@ class TileTree(TileModel, AliasedDataMixin):
         ):
             raise ValidationError(_("Graph Has Different Publication"))
 
-        if arches_version < (8, 0) and self.nodegroup:
-            # Cannot supply this too early, as nodegroup might be included
-            # with the request and already instantiated to a fresh object.
-            self.nodegroup.grouping_node = self.nodegroup.node_set.get(
-                pk=models.F("nodegroup")
-            )
         request = request or self._request
         # Mimic some computations trapped on TileModel.save().
         if (

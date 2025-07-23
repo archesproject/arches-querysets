@@ -5,6 +5,7 @@ from operator import attrgetter
 
 from django.core.exceptions import ValidationError
 from django.db import ProgrammingError, transaction
+from django.db.models import F
 from django.utils.translation import get_language, gettext as _
 
 from arches import VERSION as arches_version
@@ -66,6 +67,11 @@ class TileTreeOperation:
                 resourceinstance_id=self.resourceid,
                 nodegroup_id__in=[ng.pk for ng in self.nodegroups],
             ).order_by("sortorder")
+            if arches_version < (8, 0):
+                # Cannot supply this too early, as nodegroup might be included
+                # with the request and already instantiated to a fresh object.
+                grouping_node = entry.nodegroup.node_set.get(pk=F("nodegroup"))
+                entry.nodegroup.grouping_node = grouping_node
         else:
             self.resourceid = self.entry.pk
             self.nodegroups = []  # not necessary to populate.
