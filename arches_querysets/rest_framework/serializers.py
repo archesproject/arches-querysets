@@ -504,7 +504,6 @@ class ArchesTileSerializer(serializers.ModelSerializer, NodeFetcherMixin):
     def __init__(self, instance=None, data=empty, *, context=None, **kwargs):
         self._graph_slug = kwargs.pop("graph_slug", None)
         self._permitted_nodes = kwargs.pop("permitted_nodes", [])
-        self.parent = None
         if not context:
             context = self.ensure_context(
                 graph_slug=self._graph_slug,
