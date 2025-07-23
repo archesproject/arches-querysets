@@ -1,4 +1,5 @@
 import unittest
+import uuid
 from http import HTTPStatus
 
 from django.core.management import call_command
@@ -7,6 +8,10 @@ from arches import VERSION as arches_version
 from arches.app.models.graph import Graph
 from arches.app.models.models import EditLog
 
+from arches_querysets.rest_framework.serializers import (
+    ArchesResourceSerializer,
+    ArchesTileSerializer,
+)
 from arches_querysets.utils.tests import GraphTestCase
 
 
@@ -110,3 +115,22 @@ class RestFrameworkTests(GraphTestCase):
             "Graph Has Different Publication",
             status_code=HTTPStatus.BAD_REQUEST,
         )
+
+    def test_instantiate_empty_resource_serializer(self):
+        serializer = ArchesResourceSerializer(graph_slug="datatype_lookups")
+        self.assertIsInstance(serializer.data["resourceinstanceid"], uuid.UUID)
+        # Default values are stocked.
+        self.assertEqual(
+            serializer.data["aliased_data"]["datatypes_1"]["aliased_data"]["number"][
+                "node_value"
+            ],
+            7,
+        )
+
+    def test_instantiate_empty_tile_serializer(self):
+        serializer = ArchesTileSerializer(
+            graph_slug="datatype_lookups", nodegroup_alias="datatypes_1"
+        )
+        self.assertIsInstance(serializer.data["tileid"], uuid.UUID)
+        # Default values are stocked.
+        self.assertEqual(serializer.data["aliased_data"]["number"]["node_value"], 7)

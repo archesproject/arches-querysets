@@ -19,6 +19,7 @@ from arches.app.utils.betterJSONSerializer import JSONSerializer
 
 from arches_querysets.datatypes.datatypes import DataTypeFactory
 from arches_querysets.models import AliasedData, ResourceTileTree, TileTree
+from arches_querysets.utils.models import ensure_request
 from arches_querysets.rest_framework.field_mixins import NodeValueMixin
 
 
@@ -141,6 +142,15 @@ class NodeFetcherMixin:
     @property
     def nodegroup_alias(self):
         return self.context.get("nodegroup_alias")
+
+    def ensure_context(self, *, graph_slug, permitted_nodes, nodegroup_alias=None):
+        # The view provides a context, so this is mainly here for CLI usage.
+        return {
+            "graph_slug": graph_slug,
+            "permitted_nodes": permitted_nodes,
+            "nodegroup_alias": nodegroup_alias,
+            "request": ensure_request(request=None),
+        }
 
 
 class ResourceAliasedDataSerializer(serializers.Serializer, NodeFetcherMixin):
@@ -429,7 +439,9 @@ class TileAliasedDataSerializer(serializers.ModelSerializer, NodeFetcherMixin):
 class ArchesTileSerializer(serializers.ModelSerializer, NodeFetcherMixin):
     # These fields are declared here in full instead of massaged via
     # "extra_kwargs" in class Meta to support subclassing by TileAliasedDataSerializer.
-    tileid = serializers.UUIDField(validators=[], required=False, allow_null=True)
+    tileid = serializers.UUIDField(
+        validators=[], required=False, initial=uuid.uuid4, allow_null=True
+    )
     resourceinstance = serializers.PrimaryKeyRelatedField(
         queryset=ResourceTileTree.objects.all(),
         required=False,
@@ -455,9 +467,17 @@ class ArchesTileSerializer(serializers.ModelSerializer, NodeFetcherMixin):
         root_node = None
         fields = "__all__"
 
-    def __init__(self, instance=None, data=empty, **kwargs):
+    def __init__(self, instance=None, data=empty, *, context=None, **kwargs):
         self._graph_slug = kwargs.pop("graph_slug", None)
         self._permitted_nodes = kwargs.pop("permitted_nodes", [])
+        self.parent = None
+        if not context:
+            context = self.ensure_context(
+                graph_slug=self._graph_slug,
+                permitted_nodes=self._permitted_nodes,
+                nodegroup_alias=kwargs.pop("nodegroup_alias", None),
+            )
+        kwargs["context"] = context
         super().__init__(instance, data, **kwargs)
         self._child_nodegroup_aliases = []
 
@@ -549,16 +569,14 @@ class ArchesResourceSerializer(serializers.ModelSerializer, NodeFetcherMixin):
             "graph": {"allow_null": True},
         }
 
-    def __init__(self, *args, graph_slug=None, permitted_nodes=None, **kwargs):
-        if not kwargs.get("context"):
-            # The view provides a context, so this is mainly here for CLI usage.
-            self.parent = None
-            context = {
-                "graph_slug": graph_slug,
-                "permitted_nodes": permitted_nodes or self.find_permitted_nodes(),
-            }
-            kwargs = {**kwargs, "context": context}
-
+    def __init__(
+        self, *args, graph_slug=None, permitted_nodes=None, context=None, **kwargs
+    ):
+        if not context:
+            context = self.ensure_context(
+                graph_slug=graph_slug, permitted_nodes=permitted_nodes
+            )
+        kwargs["context"] = context
         super().__init__(*args, **kwargs)
 
     def build_relational_field(self, field_name, relation_info):
