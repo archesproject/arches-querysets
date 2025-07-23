@@ -127,9 +127,9 @@ class TileTreeOperation:
         """Move values from resource or tile to prefetched tiles, and validate.
         Raises ValidationError if new data fails datatype validation.
 
-        HTTP PUT request should request delete_absent_children=True
-        to delete child tiles not present in the payload.
-        HTTP PATCH request should request delete_absent_children=False (default).
+        HTTP PUT should request delete_absent_children=True to delete child tiles
+        not in the payload.
+        HTTP PATCH should request delete_absent_children=False (default).
         """
         original_tile_data_by_tile_id = {}
         if isinstance(self.entry, TileModel):
@@ -299,6 +299,8 @@ class TileTreeOperation:
         from arches_querysets.models import AliasedData, TileTree
 
         for node in nodes:
+            if node.datatype == "semantic":
+                continue
             if isinstance(tile._incoming_tile, TileTree) and isinstance(
                 tile._incoming_tile.aliased_data, AliasedData
             ):
@@ -313,6 +315,7 @@ class TileTreeOperation:
                 if self.partial:
                     continue
                 value_to_validate = TileTree.get_default_value(node)
+                tile._incoming_tile.set_aliased_data(node, value_to_validate)
             if isinstance(value_to_validate, dict):
                 value_to_validate = value_to_validate.get(
                     "node_value", value_to_validate
