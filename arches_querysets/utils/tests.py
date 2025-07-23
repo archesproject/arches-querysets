@@ -48,6 +48,13 @@ class GraphTestCase(TestCase):
         graph_proxy = Graph.objects.get(pk=cls.graph.pk)
         if arches_version < (8, 0):
             graph_proxy.refresh_from_database()
+            if cls.test_child_nodegroups:
+                # Repair parent nodegroup link broken by get_nodegroups()!
+                for node in graph_proxy.nodes.values():
+                    if node.nodegroup == cls.nodegroup_1_child:
+                        if node.nodegroup.parentnodegroup != cls.nodegroup_1:
+                            node.nodegroup.parentnodegroup = cls.nodegroup_1
+                            node.nodegroup.save()
         graph_proxy.publish(user=None)
         cls.graph.publication = graph_proxy.publication
 
