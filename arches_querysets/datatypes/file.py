@@ -2,7 +2,6 @@ from django.utils.translation import get_language
 
 from arches.app.datatypes import datatypes
 from arches.app.models import models
-from arches import VERSION as arches_version
 
 
 class FileListDataType(datatypes.FileListDataType):
@@ -16,10 +15,17 @@ class FileListDataType(datatypes.FileListDataType):
 
         language = get_language()
 
-        if not isinstance(value, dict) and arches_version < (8, 1):
-            value = super().transform_value_for_tile(
-                value, languages=languages, **kwargs
-            )
+        if isinstance(value, str):
+            stringified_list = value
+        elif isinstance(value, list) and all(
+            isinstance(file_info, dict) for file_info in value
+        ):
+            stringified_list = ",".join([file_info.get("name") for file_info in value])
+        else:
+            raise TypeError(value)
+        value = super().transform_value_for_tile(
+            stringified_list, languages=languages, **kwargs
+        )
 
         for file_info in value:
             for key, val in file_info.items():

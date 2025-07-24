@@ -173,6 +173,75 @@ class DatatypeMethodTests(GraphTestCase):
         # Test that the transformation of values for tile works correctly.
         test_values = {
             # TODO - add more datatypes tests here.
+            "file-list": {
+                "input": "commma-separated-list.png,from-bulk-data-manager.jpg",
+                "output": [
+                    {
+                        "status": "uploaded",
+                        "name": "commma-separated-list.png",
+                        "type": "image/png",
+                        "file_id": "b503428b-1e04-4c79-8188-f70837461a07",
+                        "url": "/files/b503428b-1e04-4c79-8188-f70837461a07",
+                        "accepted": True,
+                        "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
+                    },
+                    {
+                        "status": "uploaded",
+                        "name": "from-bulk-data-manager.jpg",
+                        "type": "image/jpeg",
+                        "file_id": "35a11db0-3796-4b25-becd-b369096a0942",
+                        "url": "/files/35a11db0-3796-4b25-becd-b369096a0942",
+                        "accepted": True,
+                        "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
+                    },
+                ],
+                "equality_test": lambda list1, list2: list1[0].keys()
+                == list2[0].keys(),
+            },
+            "file-list": {
+                "input": [
+                    {
+                        "status": "uploaded",
+                        "name": "commma-separated-list.png",
+                        "type": "image/png",
+                        "file_id": "b503428b-1e04-4c79-8188-f70837461a07",
+                        "url": "/files/b503428b-1e04-4c79-8188-f70837461a07",
+                        "accepted": True,
+                        "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
+                    },
+                    {
+                        "status": "uploaded",
+                        "name": "from-bulk-data-manager.jpg",
+                        "type": "image/jpeg",
+                        "file_id": "35a11db0-3796-4b25-becd-b369096a0942",
+                        "url": "/files/35a11db0-3796-4b25-becd-b369096a0942",
+                        "accepted": True,
+                        "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
+                    },
+                ],
+                "output": [
+                    {
+                        "status": "uploaded",
+                        "name": "commma-separated-list.png",
+                        "type": "image/png",
+                        "file_id": "b503428b-1e04-4c79-8188-f70837461a07",
+                        "url": "/files/b503428b-1e04-4c79-8188-f70837461a07",
+                        "accepted": True,
+                        "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
+                    },
+                    {
+                        "status": "uploaded",
+                        "name": "from-bulk-data-manager.jpg",
+                        "type": "image/jpeg",
+                        "file_id": "35a11db0-3796-4b25-becd-b369096a0942",
+                        "url": "/files/35a11db0-3796-4b25-becd-b369096a0942",
+                        "accepted": True,
+                        "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
+                    },
+                ],
+                "equality_test": lambda list1, list2: list1[0].keys()
+                == list2[0].keys(),
+            },
             "resource-instance": {
                 "input": self.resource_42.pk,  # test as uuid
                 "output": [
@@ -257,4 +326,7 @@ class DatatypeMethodTests(GraphTestCase):
                 transformed_value = datatype_instance.transform_value_for_tile(
                     value["input"]
                 )
-                self.assertEqual(transformed_value, value["output"])
+                if equality_test := value.get("equality_test"):
+                    self.assertTrue(equality_test(transformed_value, value["output"]))
+                else:
+                    self.assertEqual(transformed_value, value["output"])
