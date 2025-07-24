@@ -11,6 +11,8 @@ from arches_querysets.utils.tests import GraphTestCase
 
 
 class RestFrameworkTests(GraphTestCase):
+    test_child_nodegroups = True
+
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
