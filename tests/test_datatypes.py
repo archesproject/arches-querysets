@@ -173,160 +173,169 @@ class DatatypeMethodTests(GraphTestCase):
         # Test that the transformation of values for tile works correctly.
         test_values = {
             # TODO - add more datatypes tests here.
-            "file-list": {
-                "input": "commma-separated-list.png,from-bulk-data-manager.jpg",
-                "output": [
-                    {
-                        "status": "uploaded",
-                        "name": "commma-separated-list.png",
-                        "type": "image/png",
-                        "file_id": "b503428b-1e04-4c79-8188-f70837461a07",
-                        "url": "/files/b503428b-1e04-4c79-8188-f70837461a07",
-                        "accepted": True,
-                        "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
-                    },
-                    {
-                        "status": "uploaded",
-                        "name": "from-bulk-data-manager.jpg",
-                        "type": "image/jpeg",
-                        "file_id": "35a11db0-3796-4b25-becd-b369096a0942",
-                        "url": "/files/35a11db0-3796-4b25-becd-b369096a0942",
-                        "accepted": True,
-                        "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
-                    },
-                ],
-                "equality_test": lambda list1, list2: list1[0].keys()
-                == list2[0].keys(),
-            },
-            "file-list": {
-                "input": [
-                    {
-                        "status": "uploaded",
-                        "name": "commma-separated-list.png",
-                        "type": "image/png",
-                        "file_id": "b503428b-1e04-4c79-8188-f70837461a07",
-                        "url": "/files/b503428b-1e04-4c79-8188-f70837461a07",
-                        "accepted": True,
-                        "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
-                    },
-                    {
-                        "status": "uploaded",
-                        "name": "from-bulk-data-manager.jpg",
-                        "type": "image/jpeg",
-                        "file_id": "35a11db0-3796-4b25-becd-b369096a0942",
-                        "url": "/files/35a11db0-3796-4b25-becd-b369096a0942",
-                        "accepted": True,
-                        "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
-                    },
-                ],
-                "output": [
-                    {
-                        "status": "uploaded",
-                        "name": "commma-separated-list.png",
-                        "type": "image/png",
-                        "file_id": "b503428b-1e04-4c79-8188-f70837461a07",
-                        "url": "/files/b503428b-1e04-4c79-8188-f70837461a07",
-                        "accepted": True,
-                        "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
-                    },
-                    {
-                        "status": "uploaded",
-                        "name": "from-bulk-data-manager.jpg",
-                        "type": "image/jpeg",
-                        "file_id": "35a11db0-3796-4b25-becd-b369096a0942",
-                        "url": "/files/35a11db0-3796-4b25-becd-b369096a0942",
-                        "accepted": True,
-                        "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
-                    },
-                ],
-                "equality_test": lambda list1, list2: list1[0].keys()
-                == list2[0].keys(),
-            },
-            "resource-instance": {
-                "input": self.resource_42.pk,  # test as uuid
-                "output": [
-                    {
-                        "resourceId": str(self.resource_42.pk),
-                        "ontologyProperty": "",
-                        "inverseOntologyProperty": "",
-                    }
-                ],
-            },
-            "resource-instance": {
-                "input": str(self.resource_42.pk),  # test as string
-                "output": [
-                    {
-                        "resourceId": str(self.resource_42.pk),
-                        "ontologyProperty": "",
-                        "inverseOntologyProperty": "",
-                    }
-                ],
-            },
-            "resource-instance": {
-                "input": self.resource_42,  # test as model instance
-                "output": [
-                    {
-                        "resourceId": str(self.resource_42.pk),
-                        "ontologyProperty": "",
-                        "inverseOntologyProperty": "",
-                    }
-                ],
-            },
-            "resource-instance": {
-                "input": json.dumps(
-                    [
-                        {  # test as stringified dict
+            "file-list": [
+                {
+                    "input": "commma-separated-list.png,from-bulk-data-manager.jpg",
+                    "output": [
+                        {
+                            "status": "uploaded",
+                            "name": "commma-separated-list.png",
+                            "type": "image/png",
+                            "file_id": "b503428b-1e04-4c79-8188-f70837461a07",
+                            "url": "/files/b503428b-1e04-4c79-8188-f70837461a07",
+                            "accepted": True,
+                            "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
+                        },
+                        {
+                            "status": "uploaded",
+                            "name": "from-bulk-data-manager.jpg",
+                            "type": "image/jpeg",
+                            "file_id": "35a11db0-3796-4b25-becd-b369096a0942",
+                            "url": "/files/35a11db0-3796-4b25-becd-b369096a0942",
+                            "accepted": True,
+                            "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
+                        },
+                    ],
+                    "equality_test": lambda list1, list2: list1[0].keys()
+                    == list2[0].keys(),
+                },
+                {
+                    "input": [
+                        {
+                            "status": "uploaded",
+                            "name": "commma-separated-list.png",
+                            "type": "image/png",
+                            "file_id": "b503428b-1e04-4c79-8188-f70837461a07",
+                            "url": "/files/b503428b-1e04-4c79-8188-f70837461a07",
+                            "accepted": True,
+                            "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
+                        },
+                        {
+                            "status": "uploaded",
+                            "name": "from-bulk-data-manager.jpg",
+                            "type": "image/jpeg",
+                            "file_id": "35a11db0-3796-4b25-becd-b369096a0942",
+                            "url": "/files/35a11db0-3796-4b25-becd-b369096a0942",
+                            "accepted": True,
+                            "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
+                        },
+                    ],
+                    "output": [
+                        {
+                            "status": "uploaded",
+                            "name": "commma-separated-list.png",
+                            "type": "image/png",
+                            "file_id": "b503428b-1e04-4c79-8188-f70837461a07",
+                            "url": "/files/b503428b-1e04-4c79-8188-f70837461a07",
+                            "accepted": True,
+                            "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
+                        },
+                        {
+                            "status": "uploaded",
+                            "name": "from-bulk-data-manager.jpg",
+                            "type": "image/jpeg",
+                            "file_id": "35a11db0-3796-4b25-becd-b369096a0942",
+                            "url": "/files/35a11db0-3796-4b25-becd-b369096a0942",
+                            "accepted": True,
+                            "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
+                        },
+                    ],
+                    "equality_test": lambda list1, list2: list1[0].keys()
+                    == list2[0].keys(),
+                },
+            ],
+            "resource-instance": [
+                {
+                    "input": self.resource_42.pk,  # test as uuid
+                    "output": [
+                        {
+                            "resourceId": str(self.resource_42.pk),
+                            "ontologyProperty": "",
+                            "inverseOntologyProperty": "",
+                        }
+                    ],
+                },
+                {
+                    "input": str(self.resource_42.pk),  # test as string
+                    "output": [
+                        {
+                            "resourceId": str(self.resource_42.pk),
+                            "ontologyProperty": "",
+                            "inverseOntologyProperty": "",
+                        }
+                    ],
+                },
+                {
+                    "input": self.resource_42,  # test as model instance
+                    "output": [
+                        {
+                            "resourceId": str(self.resource_42.pk),
+                            "ontologyProperty": "",
+                            "inverseOntologyProperty": "",
+                        }
+                    ],
+                },
+                {
+                    "input": json.dumps(
+                        [
+                            {  # test as stringified dict
+                                "resourceId": str(self.resource_42.pk),
+                                "ontologyProperty": "testProperty",
+                                "inverseOntologyProperty": "testInverseProperty",
+                            }
+                        ]
+                    ),
+                    "output": [
+                        {
                             "resourceId": str(self.resource_42.pk),
                             "ontologyProperty": "testProperty",
                             "inverseOntologyProperty": "testInverseProperty",
                         }
-                    ]
-                ),
-                "output": [
-                    {
-                        "resourceId": str(self.resource_42.pk),
-                        "ontologyProperty": "testProperty",
-                        "inverseOntologyProperty": "testInverseProperty",
-                    }
-                ],
-            },
-            "resource-instance": {
-                "input": [
-                    {  # test as dict
-                        "resourceId": str(self.resource_42.pk),
-                        "ontologyProperty": "testProperty",
-                        "inverseOntologyProperty": "testInverseProperty",
-                    }
-                ],
-                "output": [
-                    {
-                        "resourceId": str(self.resource_42.pk),
-                        "ontologyProperty": "testProperty",
-                        "inverseOntologyProperty": "testInverseProperty",
-                    }
-                ],
-            },
-            "resource-instance-list": {
-                "input": [self.resource_42.pk],
-                "output": [
-                    {
-                        "resourceId": str(self.resource_42.pk),
-                        "ontologyProperty": "",
-                        "inverseOntologyProperty": "",
-                    }
-                ],
-            },
+                    ],
+                },
+                {
+                    "input": [
+                        {  # test as dict
+                            "resourceId": str(self.resource_42.pk),
+                            "ontologyProperty": "testProperty",
+                            "inverseOntologyProperty": "testInverseProperty",
+                        }
+                    ],
+                    "output": [
+                        {
+                            "resourceId": str(self.resource_42.pk),
+                            "ontologyProperty": "testProperty",
+                            "inverseOntologyProperty": "testInverseProperty",
+                        }
+                    ],
+                },
+            ],
+            "resource-instance-list": [
+                {
+                    "input": [self.resource_42.pk],
+                    "output": [
+                        {
+                            "resourceId": str(self.resource_42.pk),
+                            "ontologyProperty": "",
+                            "inverseOntologyProperty": "",
+                        }
+                    ],
+                }
+            ],
         }
 
-        for datatype, value in test_values.items():
-            with self.subTest(datatype=datatype, value=value["input"]):
-                datatype_instance = self.datatype_factory.get_instance(
-                    datatype=datatype
-                )
-                transformed_value = datatype_instance.transform_value_for_tile(
-                    value["input"]
-                )
-                if equality_test := value.get("equality_test"):
-                    self.assertTrue(equality_test(transformed_value, value["output"]))
-                else:
-                    self.assertEqual(transformed_value, value["output"])
+        for datatype, cases in test_values.items():
+            for value in cases:
+                with self.subTest(datatype=datatype, value=value["input"]):
+                    datatype_instance = self.datatype_factory.get_instance(
+                        datatype=datatype
+                    )
+                    transformed_value = datatype_instance.transform_value_for_tile(
+                        value["input"]
+                    )
+                    if equality_test := value.get("equality_test"):
+                        self.assertTrue(
+                            equality_test(transformed_value, value["output"])
+                        )
+                    else:
+                        self.assertEqual(transformed_value, value["output"])
