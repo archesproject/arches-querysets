@@ -21,7 +21,7 @@ class GenericLookupTests(GraphTestCase):
             ("non_localized_string", "forty-two"),
             ("string__en__value", "forty-two"),
             ("date", "2042-04-02"),
-            # More natural lookups in test_resource_instance_lookups()
+            # More natural lookups in ResourceInstanceLookupTests
             ("resource_instance__0__ontologyProperty", ""),
             ("resource_instance_list__0__ontologyProperty", ""),
             ("concept", str(self.concept_value.pk)),
@@ -62,6 +62,28 @@ class GenericLookupTests(GraphTestCase):
                 self.assertTrue(self.tiles_n.values(node.alias))
                 self.assertTrue(self.resources.values_list(node.alias))
                 self.assertTrue(self.tiles_n.values_list(node.alias))
+
+
+class NonLocalizedStringLookupTests(GenericLookupTests):
+    def test_cardinality_1(self):
+        self.assertTrue(self.resources.filter(non_localized_string__contains="forty"))
+
+    def test_cardinality_n(self):
+        self.assertTrue(
+            self.resources.filter(non_localized_string_n__contains=["forty-two"])
+        )
+        self.assertFalse(
+            self.resources.filter(non_localized_string_n__contains=["forty"])
+        )
+        self.assertTrue(
+            self.resources.filter(non_localized_string_n__any_contains="forty")
+        )
+        self.assertFalse(
+            self.resources.filter(non_localized_string_n__any_contains="FORTY")
+        )
+        self.assertTrue(
+            self.resources.filter(non_localized_string_n__any_icontains="FORTY")
+        )
 
 
 class LocalizedStringLookupTests(GenericLookupTests):
