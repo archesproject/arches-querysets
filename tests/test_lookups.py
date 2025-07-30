@@ -144,3 +144,11 @@ class ResourceInstanceLookupTests(GenericLookupTests):
         ]:
             with self.subTest(lookup=lookup, value=value):
                 self.assertTrue(self.resources.filter(**{lookup: value}))
+
+
+class NumberLookupTests(GenericLookupTests):
+    def test_cardinality_1(self):
+        self.assertTrue(self.resources.filter(number__lte=42))
+
+    def test_cardinality_n(self):
+        self.assertTrue(self.resources.filter(number_n__contains=[42]))
