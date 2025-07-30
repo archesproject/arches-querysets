@@ -22,27 +22,31 @@ class GenericLookupTests(GraphTestCase):
             ("string__en__value", "forty-two"),
             ("date", "2042-04-02"),
             # More natural lookups in ResourceInstanceLookupTests
-            ("resource_instance__0__ontologyProperty", ""),
-            ("resource_instance_list__0__ontologyProperty", ""),
-            ("concept", str(self.concept_value.pk)),
+            ("resource_instance__0__resourceId", str(self.resource_42.pk)),
+            ("resource_instance_list__0__resourceId", str(self.resource_42.pk)),
+            ("concept", self.concept_value.pk),
             ("concept_list", [str(self.concept_value.pk)]),
-            # TODO: More natural lookups
-            ("node_value", str(self.cardinality_1_tile.pk)),
+            ("node_value", self.cardinality_1_tile.pk),
         ]:
             with self.subTest(lookup=lookup, value=value):
                 self.assertTrue(self.resources.filter(**{lookup: value}))
 
     def test_cardinality_n(self):
-        # Exact
+        # Contains
         for lookup, value in [
             ("boolean_n__contains", [True]),
             ("number_n__contains", [42.0]),
-            # ("url_n__url_label", "42.com"),
+            ("url_n__0__url_label", "42.com"),
             ("non_localized_string_n__contains", ["forty-two"]),
             ("date_n__contains", ["2042-04-02"]),
-            ("concept_n__contains", [str(self.concept_value.pk)]),
-            # ("concept_list_n__contains", [str(self.concept_value.pk)]),
-            ("node_value_n__contains", [str(self.cardinality_n_tile.pk)]),
+            # better lookups for RI{list} below.
+            ("resource_instance__0__resourceId", str(self.resource_42.pk)),
+            # you likely want ids_contain, below.
+            ("resource_instance_list__0__resourceId", str(self.resource_42.pk)),
+            ("concept_n__contains", [self.concept_value.pk]),
+            # you likely want any_contains, below.
+            ("concept_list_n__0__contains", str(self.concept_value.pk)),
+            ("node_value_n__contains", [self.cardinality_n_tile.pk]),
         ]:
             with self.subTest(lookup=lookup, value=value):
                 self.assertTrue(self.resources.filter(**{lookup: value}))
