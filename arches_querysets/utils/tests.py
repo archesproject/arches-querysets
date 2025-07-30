@@ -78,7 +78,7 @@ class GraphTestCase(TestCase):
 
     @classmethod
     def create_data_collecting_nodes(cls):
-        cls.datatypes = DDataType.objects.all()
+        cls.datatypes = DDataType.objects.exclude(datatype="semantic")
         cls.data_nodes_1 = [
             Node(
                 datatype=datatype.pk,
