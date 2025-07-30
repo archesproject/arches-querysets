@@ -140,7 +140,7 @@ class ResourceInstanceLookupTests(GenericLookupTests):
     def test_cardinality_n(self):
         for lookup, value in [
             ("resource_instance_n__ids_contain", str(self.resource_42.pk)),
-            # ("resource_instance_list_n__ids__contain", str(self.resource_42.pk)),
+            ("resource_instance_list_n__ids_contain", str(self.resource_42.pk)),
         ]:
             with self.subTest(lookup=lookup, value=value):
                 self.assertTrue(self.resources.filter(**{lookup: value}))
