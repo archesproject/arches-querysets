@@ -30,6 +30,7 @@ class GenericLookupTests(GraphTestCase):
         ]:
             with self.subTest(lookup=lookup, value=value):
                 self.assertTrue(self.resources.filter(**{lookup: value}))
+                self.assertTrue(self.tiles_1.filter(**{lookup: value}))
 
     def test_cardinality_n(self):
         # Contains
