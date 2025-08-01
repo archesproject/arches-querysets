@@ -1,14 +1,14 @@
-from django.db.models import Lookup
-from django.db.models.lookups import Contains, IContains, Transform
+from django.db.models.lookups import Lookup, PatternLookup, Transform
 from psycopg2.extensions import AsIs, QuotedString
 
 from arches_querysets.fields import (
     CardinalityNResourceInstanceField,
-    CardinalityNStringField,
+    CardinalityNResourceInstanceListField,
+    CardinalityNLocalizedStringField,
     CardinalityNTextField,
     ResourceInstanceListField,
     ResourceInstanceField,
-    StringField,
+    LocalizedStringField,
 )
 
 
@@ -22,9 +22,10 @@ class JSONPathFilter:
 
 
 @CardinalityNTextField.register_lookup
-class ArrayContains(Contains):
-    """Provide a string. Adapted from https://code.djangoproject.com/ticket/34942"""
+class AnyContains(PatternLookup):
+    """Provide a single string. Adapted from https://code.djangoproject.com/ticket/34942"""
 
+    lookup_name = "any_contains"
     like_operator = "LIKE"
 
     def as_sql(self, compiler, connection):
@@ -40,11 +41,12 @@ class ArrayContains(Contains):
 
 
 @CardinalityNTextField.register_lookup
-class ArrayIContains(IContains):
+class AnyIContains(AnyContains):
+    lookup_name = "any_icontains"
     like_operator = "ILIKE"
 
 
-@StringField.register_lookup
+@LocalizedStringField.register_lookup
 class AnyLanguageStartsWith(JSONPathFilter, Lookup):
     lookup_name = "any_lang_startswith"
 
@@ -55,7 +57,7 @@ class AnyLanguageStartsWith(JSONPathFilter, Lookup):
         return "%s @? '$.*.value ? (@ starts with \"%s\")'" % (lhs, rhs), params
 
 
-@StringField.register_lookup
+@LocalizedStringField.register_lookup
 class AnyLanguageIStartsWith(JSONPathFilter, Lookup):
     lookup_name = "any_lang_istartswith"
 
@@ -69,7 +71,7 @@ class AnyLanguageIStartsWith(JSONPathFilter, Lookup):
         )
 
 
-@StringField.register_lookup
+@LocalizedStringField.register_lookup
 class AnyLanguageContains(JSONPathFilter, Lookup):
     lookup_name = "any_lang_contains"
 
@@ -80,7 +82,7 @@ class AnyLanguageContains(JSONPathFilter, Lookup):
         return "%s @? '$.*.value ? (@ like_regex \"%s\")'" % (lhs, rhs), params
 
 
-@StringField.register_lookup
+@LocalizedStringField.register_lookup
 class AnyLanguageIContains(JSONPathFilter, Lookup):
     lookup_name = "any_lang_icontains"
 
@@ -111,6 +113,20 @@ class ArrayResourceInstanceId(JSONPathFilter, Lookup):
         )
 
 
+@CardinalityNResourceInstanceListField.register_lookup
+class ArrayArrayResourceInstanceId(JSONPathFilter, Lookup):
+    lookup_name = "ids_contain"
+
+    def as_sql(self, compiler, connection):
+        lhs, lhs_params = self.process_lhs(compiler, connection)
+        rhs, rhs_params = self.process_rhs(compiler, connection)
+        params = (*lhs_params, *rhs_params)
+        return (
+            "TO_JSONB(%s) @? '$[*][*][*].resourceId ? (@ == \"%s\")'" % (lhs, rhs),
+            params,
+        )
+
+
 @ResourceInstanceListField.register_lookup
 class ResourceInstanceListContains(JSONPathFilter, Lookup):
     lookup_name = "contains"
@@ -122,7 +138,7 @@ class ResourceInstanceListContains(JSONPathFilter, Lookup):
         return "%s @? '$[*].resourceId ? (@ == \"%s\")'" % (lhs, rhs), params
 
 
-@CardinalityNStringField.register_lookup
+@CardinalityNLocalizedStringField.register_lookup
 class ArrayAnyLanguageEquals(JSONPathFilter, Lookup):
     lookup_name = "any_lang"
 
@@ -133,7 +149,7 @@ class ArrayAnyLanguageEquals(JSONPathFilter, Lookup):
         return "TO_JSONB(%s) @? '$[*].*.value ? (@ == \"%s\")'" % (lhs, rhs), params
 
 
-@CardinalityNStringField.register_lookup
+@CardinalityNLocalizedStringField.register_lookup
 class ArrayAnyLanguageContains(JSONPathFilter, Lookup):
     lookup_name = "any_lang_contains"
 
@@ -147,7 +163,7 @@ class ArrayAnyLanguageContains(JSONPathFilter, Lookup):
         )
 
 
-@CardinalityNStringField.register_lookup
+@CardinalityNLocalizedStringField.register_lookup
 class ArrayAnyLanguageIContains(JSONPathFilter, Lookup):
     lookup_name = "any_lang_icontains"
 
@@ -162,7 +178,7 @@ class ArrayAnyLanguageIContains(JSONPathFilter, Lookup):
         )
 
 
-@CardinalityNStringField.register_lookup
+@CardinalityNLocalizedStringField.register_lookup
 class ArrayAnyLanguageStartsWith(JSONPathFilter, Lookup):
     lookup_name = "any_lang_startswith"
 
@@ -176,7 +192,7 @@ class ArrayAnyLanguageStartsWith(JSONPathFilter, Lookup):
         )
 
 
-@CardinalityNStringField.register_lookup
+@CardinalityNLocalizedStringField.register_lookup
 class ArrayAnyLanguageIStartsWith(JSONPathFilter, Lookup):
     lookup_name = "any_lang_istartswith"
 

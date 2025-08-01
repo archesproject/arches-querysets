@@ -43,6 +43,9 @@ class GraphTestCase(TestCase):
             graph_proxy.refresh_from_database()
         graph_proxy.publish(user=None)
         cls.graph.publication = graph_proxy.publication
+        for resource in [cls.resource_42, cls.resource_none]:
+            resource.publication = cls.graph.publication
+            resource.save()
 
     @classmethod
     def create_graph(cls):
@@ -78,7 +81,7 @@ class GraphTestCase(TestCase):
 
     @classmethod
     def create_data_collecting_nodes(cls):
-        cls.datatypes = DDataType.objects.all()
+        cls.datatypes = DDataType.objects.exclude(datatype="semantic")
         cls.data_nodes_1 = [
             Node(
                 datatype=datatype.pk,
