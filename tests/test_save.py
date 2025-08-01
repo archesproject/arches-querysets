@@ -25,7 +25,7 @@ class SaveTileTests(GraphTestCase):
 
     def assert_default_values_present(self, resource):
         for node_id_str, value in resource.aliased_data.datatypes_1.data.items():
-            node = [node for node in self.nodes if str(node.pk) == node_id_str][0]
+            node = [node for node in self.data_nodes if str(node.pk) == node_id_str][0]
             with self.subTest(alias=node.alias):
                 default_value = self.default_vals_by_nodeid[node_id_str]
                 expected = TileTree.get_cleaned_default_value(node, default_value)

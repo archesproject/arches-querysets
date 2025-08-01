@@ -97,6 +97,7 @@ runs:
       shell: bash
 
     - name: Generate Python report coverage
+      if: inputs.arches-version != '7.6'
       run: |
         coverage report
         coverage json
@@ -111,6 +112,7 @@ runs:
     #     overwrite: true
 
     - name: Upload Python coverage report as artifact
+      if: inputs.arches-version != '7.6'
       uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.branch-type }}-branch-python-coverage-report
