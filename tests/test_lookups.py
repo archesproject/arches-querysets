@@ -1,3 +1,5 @@
+from django.db.models import Max, Min
+
 from arches_querysets.models import ResourceTileTree, TileTree
 from arches_querysets.utils.tests import GraphTestCase
 
@@ -149,3 +151,26 @@ class ResourceInstanceLookupTests(GenericLookupTests):
         ]:
             with self.subTest(lookup=lookup, value=value):
                 self.assertTrue(self.resources.filter(**{lookup: value}))
+
+
+class AggregateTests(GenericLookupTests):
+    def test_number(self):
+        # Edit the resource that usually has None in all nodes to have a value of 43.
+        resource2 = ResourceTileTree.get_tiles("datatype_lookups").get(
+            pk=self.resource_none.pk
+        )
+        resource2.aliased_data.datatypes_1.aliased_data.number = 43
+        resource2.aliased_data.datatypes_n[0].aliased_data.number_n = 43
+        resource2.save(force_admin=True)
+
+        # Per-table aggregate on cardinality-1 value
+        node_alias = "number"
+        query = self.resources.aggregate(Min(node_alias), Max(node_alias))
+        self.assertEqual(query[f"{node_alias}__min"], 42.0)
+        self.assertEqual(query[f"{node_alias}__max"], 43.0)
+
+        # Per-table aggregate on arrays, e.g. [43] > [42], but [43, 42] < [43, 44]
+        node_alias = "number_n"
+        query = self.resources.aggregate(Min(node_alias), Max(node_alias))
+        self.assertEqual(query[f"{node_alias}__min"], [42.0])
+        self.assertEqual(query[f"{node_alias}__max"], [43.0])
