@@ -1,5 +1,4 @@
 import unittest
-import uuid
 from http import HTTPStatus
 
 from django.core.management import call_command
