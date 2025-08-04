@@ -473,9 +473,7 @@ class SingleNodegroupAliasedDataSerializer(TileAliasedDataSerializer):
 class ArchesTileSerializer(serializers.ModelSerializer, NodeFetcherMixin):
     # These fields are declared here in full instead of massaged via
     # "extra_kwargs" in class Meta to support subclassing by TileAliasedDataSerializer.
-    tileid = serializers.UUIDField(
-        validators=[], required=False, initial=uuid.uuid4, allow_null=True
-    )
+    tileid = serializers.UUIDField(validators=[], required=False, allow_null=True)
     resourceinstance = serializers.PrimaryKeyRelatedField(
         queryset=ResourceTileTree.objects.all(),
         required=False,
@@ -604,7 +602,7 @@ class ArchesResourceSerializer(serializers.ModelSerializer, NodeFetcherMixin):
             "resource_instance_lifecycle_state",
         )
         extra_kwargs = {
-            "resourceinstanceid": {"initial": uuid.uuid4, "allow_null": True},
+            "resourceinstanceid": {"initial": None, "allow_null": True},
             "graph": {"allow_null": True},
         }
 

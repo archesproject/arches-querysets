@@ -120,7 +120,7 @@ class RestFrameworkTests(GraphTestCase):
 
     def test_instantiate_empty_resource_serializer(self):
         serializer = ArchesResourceSerializer(graph_slug="datatype_lookups")
-        self.assertIsInstance(serializer.data["resourceinstanceid"], uuid.UUID)
+        self.assertIsNone(serializer.data["resourceinstanceid"])
         # Default values are stocked.
         self.assertEqual(
             serializer.data["aliased_data"]["datatypes_1"]["aliased_data"]["number"][
@@ -133,7 +133,7 @@ class RestFrameworkTests(GraphTestCase):
         serializer = ArchesTileSerializer(
             graph_slug="datatype_lookups", nodegroup_alias="datatypes_1"
         )
-        self.assertIsInstance(serializer.data["tileid"], uuid.UUID)
+        self.assertIsNone(serializer.data["tileid"])
         # Default values are stocked.
         self.assertEqual(serializer.data["aliased_data"]["number"]["node_value"], 7)
 
