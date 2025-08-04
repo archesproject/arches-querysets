@@ -195,3 +195,32 @@ class RestFrameworkTests(GraphTestCase):
             QUERY_STRING="exclude_children=true",
         )
         self.assertNotContains(response, "datatypes_1_child")
+
+    def test_filter_kwargs(self):
+        node_alias = "string"
+
+        response = self.client.get(
+            reverse(
+                "api-resources",
+                kwargs={"graph": "datatype_lookups"},
+            ),
+            # Additional lookups tested in test_lookups.py
+            QUERY_STRING=f"aliased_data__{node_alias}__any_lang_icontains=forty",
+        )
+        self.assertEqual(response.json()["count"], 1)
+        self.assertEqual(
+            response.json()["results"][0]["resourceinstanceid"],
+            str(self.resource_42.pk),
+        )
+
+        response = self.client.get(
+            reverse(
+                "api-tiles",
+                kwargs={"graph": "datatype_lookups", "nodegroup_alias": "datatypes_1"},
+            ),
+            QUERY_STRING=f"aliased_data__{node_alias}__any_lang_icontains=forty",
+        )
+        self.assertEqual(response.json()["count"], 1)
+        self.assertEqual(
+            response.json()["results"][0]["resourceinstance"], str(self.resource_42.pk)
+        )
