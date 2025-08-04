@@ -7,10 +7,18 @@ from arches import VERSION as arches_version
 from arches.app.models.graph import Graph
 from arches.app.models.models import EditLog
 
+from arches_querysets.rest_framework.serializers import (
+    ArchesResourceSerializer,
+    ArchesResourceTopNodegroupsSerializer,
+    ArchesSingleNodegroupSerializer,
+    ArchesTileSerializer,
+)
 from arches_querysets.utils.tests import GraphTestCase
 
 
 class RestFrameworkTests(GraphTestCase):
+    test_child_nodegroups = True
+
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -108,3 +116,82 @@ class RestFrameworkTests(GraphTestCase):
             "Graph Has Different Publication",
             status_code=HTTPStatus.BAD_REQUEST,
         )
+
+    def test_instantiate_empty_resource_serializer(self):
+        serializer = ArchesResourceSerializer(graph_slug="datatype_lookups")
+        self.assertIsNone(serializer.data["resourceinstanceid"])
+        # Default values are stocked.
+        self.assertEqual(
+            serializer.data["aliased_data"]["datatypes_1"]["aliased_data"]["number"][
+                "node_value"
+            ],
+            7,
+        )
+
+    def test_instantiate_empty_tile_serializer(self):
+        serializer = ArchesTileSerializer(
+            graph_slug="datatype_lookups", nodegroup_alias="datatypes_1"
+        )
+        self.assertIsNone(serializer.data["tileid"])
+        # Default values are stocked.
+        self.assertEqual(serializer.data["aliased_data"]["number"]["node_value"], 7)
+
+    def test_exclude_children_option(self):
+        serializer = ArchesResourceSerializer(graph_slug="datatype_lookups")
+        self.assertIn(
+            "datatypes_1_child",
+            serializer.data["aliased_data"]["datatypes_1"]["aliased_data"],
+        )
+        serializer = ArchesResourceTopNodegroupsSerializer(
+            graph_slug="datatype_lookups"
+        )
+        self.assertNotIn(
+            "datatypes_1_child",
+            serializer.data["aliased_data"]["datatypes_1"]["aliased_data"],
+        )
+        serializer = ArchesTileSerializer(
+            graph_slug="datatype_lookups", nodegroup_alias="datatypes_1"
+        )
+        self.assertIn("datatypes_1_child", serializer.data["aliased_data"])
+        serializer = ArchesSingleNodegroupSerializer(
+            graph_slug="datatype_lookups", nodegroup_alias="datatypes_1"
+        )
+        self.assertNotIn("datatypes_1_child", serializer.data["aliased_data"])
+
+    def test_blank_views_exclude_children_option(self):
+        response = self.client.get(
+            reverse(
+                "api-resource-blank",
+                kwargs={"graph": "datatype_lookups"},
+            )
+        )
+        self.assertContains(response, "datatypes_1_child")
+
+        response = self.client.get(
+            reverse(
+                "api-resource-blank",
+                kwargs={"graph": "datatype_lookups"},
+            ),
+            QUERY_STRING="exclude_children=true",
+        )
+        self.assertNotContains(response, "datatypes_1_child")
+
+        response = self.client.get(
+            reverse(
+                "api-tile-blank",
+                kwargs={"graph": "datatype_lookups", "nodegroup_alias": "datatypes_1"},
+            )
+        )
+        self.assertContains(response, "datatypes_1_child")
+
+        response = self.client.get(
+            reverse(
+                "api-tile-blank",
+                kwargs={
+                    "graph": "datatype_lookups",
+                    "nodegroup_alias": "datatypes_1",
+                },
+            ),
+            QUERY_STRING="exclude_children=true",
+        )
+        self.assertNotContains(response, "datatypes_1_child")
