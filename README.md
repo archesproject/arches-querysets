@@ -26,11 +26,7 @@ INSTALLED_APPS = [
 ```
 In urls.py:
 ```
-from arches_querysets.urls import arches_rest_framework_urls
-urlpatterns = [
-    ...
-    *arches_rest_framework_urls,
-]
+urlpatterns.append(path("", include("arches_querysets.urls")))
 ```
 
 For developer install instructions, see the [Developer Setup](#developer-setup-for-contributing-to-the-arches-querysets-project) section below.
