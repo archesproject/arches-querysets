@@ -224,3 +224,17 @@ class RestFrameworkTests(GraphTestCase):
         self.assertEqual(
             response.json()["results"][0]["resourceinstance"], str(self.resource_42.pk)
         )
+
+        node_alias = "string_n"
+        response = self.client.get(
+            reverse(
+                "api-tiles",
+                kwargs={"graph": "datatype_lookups", "nodegroup_alias": "datatypes_n"},
+            ),
+            QUERY_STRING=f"aliased_data__{node_alias}__isnull=true",
+        )
+        self.assertEqual(response.json()["count"], 1)
+        self.assertEqual(
+            response.json()["results"][0]["resourceinstance"],
+            str(self.resource_none.pk),
+        )
