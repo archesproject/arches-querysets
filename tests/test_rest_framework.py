@@ -1,5 +1,6 @@
 import unittest
 from http import HTTPStatus
+from unittest.mock import patch
 
 from django.core.management import call_command
 from django.urls import reverse
@@ -26,6 +27,18 @@ class RestFrameworkTests(GraphTestCase):
         # Address flakiness.
         cls.resource_42.graph_publication = cls.resource_42.graph.publication
         cls.resource_42.save()
+
+    @unittest.skipIf(arches_version >= (8, 0), reason="Arches 7.6 only logic")
+    @patch("arches_querysets.rest_framework.serializers.get_nodegroup_alias_lookup")
+    def test_derivation_of_nodegroup_aliases(self, mocked_util):
+        """Until we drop support for Arches 7.6, we have to query nodegroup aliases
+        separately, but to do this most efficiently, this is done only once in the view
+        layer, not multiple times when building nested serializers. The serializer layer
+        still has fallback code to support scripts, see test_bind_data_to_serializer(),
+        but it shouldn't be called when using views.
+        """
+        self.client.get(reverse("api-resources", kwargs={"graph": "datatype_lookups"}))
+        mocked_util.assert_not_called()
 
     def test_create_tile_for_new_resource(self):
         create_url = reverse(
@@ -135,6 +148,20 @@ class RestFrameworkTests(GraphTestCase):
         self.assertIsNone(serializer.data["tileid"])
         # Default values are stocked.
         self.assertEqual(serializer.data["aliased_data"]["number"]["node_value"], 7)
+
+    def test_bind_data_to_serializer(self):
+        # Get some default data from the serializer.
+        static_data = ArchesTileSerializer(
+            graph_slug="datatype_lookups", nodegroup_alias="datatypes_1"
+        ).data
+        # Pretend that data came from somewhere else, and process it, e.g. in a script.
+        serializer = ArchesTileSerializer(
+            graph_slug="datatype_lookups",
+            nodegroup_alias="datatypes_1",
+            data=static_data,
+        )
+        self.assertTrue(serializer.is_valid())
+        # serializer.save() etc
 
     def test_exclude_children_option(self):
         serializer = ArchesResourceSerializer(graph_slug="datatype_lookups")
