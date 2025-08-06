@@ -5,6 +5,8 @@ from arches_querysets.utils.tests import GraphTestCase
 
 
 class SaveTileTests(GraphTestCase):
+    test_child_nodegroups = True
+
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
@@ -64,6 +66,20 @@ class SaveTileTests(GraphTestCase):
         self.resource_none.fill_blanks()
         self.assertIsInstance(self.resource_none.aliased_data.datatypes_1, TileTree)
         self.assertIsInstance(self.resource_none.aliased_data.datatypes_n[0], TileTree)
+        self.assertIsInstance(
+            self.resource_none.aliased_data.datatypes_1.aliased_data.datatypes_1_child,
+            TileTree,
+        )
+
+        # Remove the child, fill_blanks() again.
+        self.resource_none.aliased_data.datatypes_1.aliased_data.datatypes_1_child = (
+            None
+        )
+        self.resource_none.fill_blanks()
+        self.assertIsInstance(
+            self.resource_none.aliased_data.datatypes_1.aliased_data.datatypes_1_child,
+            TileTree,
+        )
 
         msg = "Attempted to append to a populated cardinality-1 nodegroup"
         with self.assertRaisesMessage(RuntimeError, msg):
