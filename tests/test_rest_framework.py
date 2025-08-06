@@ -29,7 +29,7 @@ class RestFrameworkTests(GraphTestCase):
 
     def test_create_tile_for_new_resource(self):
         create_url = reverse(
-            "api-tiles",
+            "arches_querysets:api-tiles",
             kwargs={"graph": "datatype_lookups", "nodegroup_alias": "datatypes_n"},
         )
         request_body = {"aliased_data": {"string_n": "create_value"}}
@@ -73,7 +73,7 @@ class RestFrameworkTests(GraphTestCase):
 
     def test_create_tile_for_existing_resource(self):
         create_url = reverse(
-            "api-tiles",
+            "arches_querysets:api-tiles",
             kwargs={"graph": "datatype_lookups", "nodegroup_alias": "datatypes_n"},
         )
         request_body = {
@@ -102,7 +102,7 @@ class RestFrameworkTests(GraphTestCase):
         Graph.objects.get(pk=self.graph.pk).publish(user=None)
 
         update_url = reverse(
-            "api-resource",
+            "arches_querysets:api-resource",
             kwargs={"graph": "datatype_lookups", "pk": str(self.resource_42.pk)},
         )
         self.client.login(username="dev", password="dev")
@@ -161,7 +161,7 @@ class RestFrameworkTests(GraphTestCase):
     def test_blank_views_exclude_children_option(self):
         response = self.client.get(
             reverse(
-                "api-resource-blank",
+                "arches_querysets:api-resource-blank",
                 kwargs={"graph": "datatype_lookups"},
             )
         )
@@ -169,7 +169,7 @@ class RestFrameworkTests(GraphTestCase):
 
         response = self.client.get(
             reverse(
-                "api-resource-blank",
+                "arches_querysets:api-resource-blank",
                 kwargs={"graph": "datatype_lookups"},
             ),
             QUERY_STRING="exclude_children=true",
@@ -178,7 +178,7 @@ class RestFrameworkTests(GraphTestCase):
 
         response = self.client.get(
             reverse(
-                "api-tile-blank",
+                "arches_querysets:api-tile-blank",
                 kwargs={"graph": "datatype_lookups", "nodegroup_alias": "datatypes_1"},
             )
         )
@@ -186,7 +186,7 @@ class RestFrameworkTests(GraphTestCase):
 
         response = self.client.get(
             reverse(
-                "api-tile-blank",
+                "arches_querysets:api-tile-blank",
                 kwargs={
                     "graph": "datatype_lookups",
                     "nodegroup_alias": "datatypes_1",
@@ -201,7 +201,7 @@ class RestFrameworkTests(GraphTestCase):
 
         response = self.client.get(
             reverse(
-                "api-resources",
+                "arches_querysets:api-resources",
                 kwargs={"graph": "datatype_lookups"},
             ),
             # Additional lookups tested in test_lookups.py
@@ -215,7 +215,7 @@ class RestFrameworkTests(GraphTestCase):
 
         response = self.client.get(
             reverse(
-                "api-tiles",
+                "arches_querysets:api-tiles",
                 kwargs={"graph": "datatype_lookups", "nodegroup_alias": "datatypes_1"},
             ),
             QUERY_STRING=f"aliased_data__{node_alias}__any_lang_icontains=forty",
