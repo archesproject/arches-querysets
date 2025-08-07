@@ -115,7 +115,7 @@ class NodeFetcherMixin:
             # 1. From __init__(), e.g. TileAliasedDataSerializer
             getattr(self, "_graph_slug", None)
             # 2. From Meta options
-            or self.__class__.Meta.graph_slug
+            or self.Meta.graph_slug
             # 3. From generic view
             or self.context.get("graph_slug")
             # 4. From settings
@@ -240,13 +240,12 @@ class ResourceAliasedDataSerializer(serializers.Serializer, NodeFetcherMixin):
 
     def get_default_field_names(self, declared_fields, model_info):
         field_names = super().get_default_field_names(declared_fields, model_info)
-        options = self.__class__.Meta
-        if options.fields != "__all__":
+        if self.Meta.fields != "__all__":
             raise NotImplementedError  # TODO...
-        if options.nodegroups == "__all__":
+        if self.Meta.nodegroups == "__all__":
             field_names.extend(self._root_node_aliases)
         else:
-            field_names.extend(options.nodegroups)
+            field_names.extend(self.Meta.nodegroups)
         return field_names
 
     def to_internal_value(self, data):
@@ -322,7 +321,7 @@ class TileAliasedDataSerializer(serializers.ModelSerializer, NodeFetcherMixin):
         self.finalize_initial_values(field_map)
 
         # __all__ includes children as well.
-        if self.__class__.Meta.fields == "__all__" and not self.Meta.exclude_children:
+        if self.Meta.fields == "__all__" and not self.Meta.exclude_children:
             child_query = (
                 self._root_node.nodegroup.children
                 # arches_version==9.0.0
@@ -355,7 +354,7 @@ class TileAliasedDataSerializer(serializers.ModelSerializer, NodeFetcherMixin):
 
     def get_default_field_names(self, declared_fields, model_info):
         field_names = []
-        if self.__class__.Meta.fields == "__all__":
+        if self.Meta.fields == "__all__":
             for sibling_node in self._root_node.nodegroup.node_set.all():
                 if sibling_node.datatype != "semantic":
                     field_names.append(sibling_node.alias)
@@ -525,6 +524,13 @@ class ArchesTileSerializer(serializers.ModelSerializer, NodeFetcherMixin):
                 ret["parenttile"] = None
         return ret
 
+    def to_internal_value(self, data):
+        ret = super().to_internal_value(data)
+        if arches_version < (8, 0):
+            # Simulate field default provided by Arches 8+.
+            ret["data"] = {}
+        return ret
+
     def get_default_field_names(self, declared_fields, model_info):
         field_names = super().get_default_field_names(declared_fields, model_info)
         try:
@@ -534,22 +540,17 @@ class ArchesTileSerializer(serializers.ModelSerializer, NodeFetcherMixin):
         return field_names
 
     def create(self, validated_data):
-        options = self.__class__.Meta
-        qs = options.model.get_tiles(
-            graph_slug=self.graph_slug,
-            nodegroup_alias=self.nodegroup_alias,
-            only=None,
-            as_representation=True,
-            user=self.context["request"].user,
-        )
-        validated_data["nodegroup_id"] = qs._entry_node.nodegroup_id
+        node_filters = models.Q(alias=self.nodegroup_alias, graph__slug=self.graph_slug)
         # arches_version==9.0.0
-        if arches_version < (8, 0):
-            validated_data["data"] = {}
+        if arches_version >= (8, 0):
+            node_filters &= models.Q(source_identifier=None)
+        entry_node = Node.objects.filter(node_filters).get()
+        validated_data["nodegroup_id"] = entry_node.nodegroup_id
+        # Provide some additional context to TileTree.__init__()
         validated_data["__request"] = self.context["request"]
         validated_data["__as_representation"] = True
         resource, resource_created = self.create_resource_if_missing(
-            validated_data, entry_node=qs._entry_node
+            validated_data, entry_node=entry_node
         )
         try:
             created = super().create(validated_data)
@@ -649,15 +650,14 @@ class ArchesResourceSerializer(serializers.ModelSerializer, NodeFetcherMixin):
         return attrs
 
     def create(self, validated_data):
-        options = self.__class__.Meta
         # TODO: we probably want a queryset method to do one-shot
         # creates with tile data
         without_tile_data = validated_data.copy()
         without_tile_data.pop("aliased_data", None)
         # TODO: decide on "blank" interface.
-        instance_without_tile_data = options.model.mro()[1](**without_tile_data)
+        instance_without_tile_data = self.Meta.model.mro()[1](**without_tile_data)
         instance_without_tile_data.save()
-        instance_from_factory = options.model.get_tiles(
+        instance_from_factory = self.Meta.model.get_tiles(
             graph_slug=self.graph_slug,
             only=None,
             as_representation=True,
