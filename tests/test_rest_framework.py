@@ -228,7 +228,7 @@ class RestFrameworkTests(GraphTestCase):
         node_alias = "string_n"
         response = self.client.get(
             reverse(
-                "api-tiles",
+                "arches_querysets:api-tiles",
                 kwargs={"graph": "datatype_lookups", "nodegroup_alias": "datatypes_n"},
             ),
             QUERY_STRING=f"aliased_data__{node_alias}__isnull=true",
