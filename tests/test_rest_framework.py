@@ -35,7 +35,11 @@ class RestFrameworkTests(GraphTestCase):
         still has fallback code to support scripts, see test_bind_data_to_serializer(),
         but it shouldn't be called when using views.
         """
-        self.client.get(reverse("api-resources", kwargs={"graph": "datatype_lookups"}))
+        self.client.get(
+            reverse(
+                "arches_querysets:api-resources", kwargs={"graph": "datatype_lookups"}
+            )
+        )
         mocked_util.assert_not_called()
 
     def test_create_tile_for_new_resource(self):
