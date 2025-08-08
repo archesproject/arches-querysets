@@ -47,7 +47,6 @@ def _make_tile_serializer(
         "permitted_nodes": permitted_nodes,
         "graph_slug": slug,
         "root_node": nodegroup_alias,
-        # TODO(arches_version): remove nodegroup_alias_lookup
         "nodegroup_alias_lookup": nodegroup_alias_lookup,
     }
 
@@ -285,7 +284,6 @@ class TileAliasedDataSerializer(serializers.ModelSerializer, NodeFetcherMixin):
 
     def __init__(self, instance=None, data=empty, **kwargs):
         self._permitted_nodes = kwargs.pop("permitted_nodes", [])
-        # TODO(arches_version): remove _nodegroup_alias_lookup
         self._nodegroup_alias_lookup = kwargs.pop("nodegroup_alias_lookup", {})
         self._graph_slug = kwargs.pop("graph_slug", None)
         self._root_node = kwargs.pop("root_node", None)
@@ -299,7 +297,6 @@ class TileAliasedDataSerializer(serializers.ModelSerializer, NodeFetcherMixin):
     def __deepcopy__(self, memo):
         ret = super().__deepcopy__(memo)
         ret._permitted_nodes = self._permitted_nodes
-        # TODO(arches_version): remove _nodegroup_alias_lookup
         return ret
 
     def get_value(self, dictionary):
@@ -331,12 +328,9 @@ class TileAliasedDataSerializer(serializers.ModelSerializer, NodeFetcherMixin):
                 else self._root_node.nodegroup.nodegroup_set
             )
             for child_nodegroup in child_query.all():
-                if arches_version >= (8, 0):
-                    child_nodegroup_alias = child_nodegroup.grouping_node.alias
-                else:
-                    child_nodegroup_alias = self.context["nodegroup_alias_lookup"][
-                        child_nodegroup.pk
-                    ]
+                child_nodegroup_alias = self.context["nodegroup_alias_lookup"][
+                    child_nodegroup.pk
+                ]
                 self._child_nodegroup_aliases.append(child_nodegroup_alias)
 
                 if (

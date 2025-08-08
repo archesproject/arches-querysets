@@ -28,12 +28,10 @@ class RestFrameworkTests(GraphTestCase):
         cls.resource_42.graph_publication = cls.resource_42.graph.publication
         cls.resource_42.save()
 
-    @unittest.skipIf(arches_version >= (8, 0), reason="Arches 7.6 only logic")
     @patch("arches_querysets.rest_framework.serializers.get_nodegroup_alias_lookup")
     def test_derivation_of_nodegroup_aliases(self, mocked_util):
-        """Until we drop support for Arches 7.6, we have to query nodegroup aliases
-        separately, but to do this most efficiently, this is done only once in the view
-        layer, not multiple times when building nested serializers. The serializer layer
+        """Querying nodegroup aliases should only be done once in the view layer,
+        not multiple times when building nested serializers. The serializer layer
         still has fallback code to support scripts, see test_bind_data_to_serializer(),
         but it shouldn't be called when using views.
         """

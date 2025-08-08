@@ -1,14 +1,12 @@
 from django.db import models
 
+from arches import VERSION as arches_version
 from arches.app.models.models import Node
 
 
 def get_nodegroup_alias_lookup(graph_slug):
-    """Only needed on Arches 7.6, where we lack a grouping_node field."""
-    return {
-        node.pk: node.alias
-        for node in Node.objects.filter(
-            pk=models.F("nodegroup_id"),
-            graph__slug=graph_slug,
-        ).only("alias")
-    }
+    filters = models.Q(pk=models.F("nodegroup_id"), graph__slug=graph_slug)
+    # arches_version==9.0.0
+    if arches_version >= (8, 0):
+        filters &= models.Q(source_identifier=None)
+    return {node.pk: node.alias for node in Node.objects.filter(filters).only("alias")}

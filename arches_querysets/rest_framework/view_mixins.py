@@ -41,11 +41,7 @@ class ArchesModelAPIMixin:
         options = self.serializer_class.Meta
         self.graph_slug = options.graph_slug or kwargs.get("graph")
         self.nodegroup_alias = kwargs.get("nodegroup_alias")
-        if arches_version < (8, 0):
-            self.nodegroup_alias_lookup = get_nodegroup_alias_lookup(self.graph_slug)
-        else:
-            # This lookup is not needed on v8: grouping_node.alias is used instead.
-            self.nodegroup_alias_lookup = {}
+        self.nodegroup_alias_lookup = get_nodegroup_alias_lookup(self.graph_slug)
 
         if issubclass(options.model, TileModel):
             self.nodegroup_alias = options.root_node or self.nodegroup_alias
