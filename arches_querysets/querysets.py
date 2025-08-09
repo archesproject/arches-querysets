@@ -246,8 +246,7 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
         for child_tile in sorted(child_tiles, key=attrgetter("sortorder")):
             child_nodegroup_alias = child_tile.find_nodegroup_alias()
             if child_tile.nodegroup.cardinality == "1" and child_nodegroup_alias:
-                # arches_version==9.0.0
-                # TODO(arches_version): remove `and child_nodegroup_alias`
+                # TODO(arches_version==9.0.0): remove `and child_nodegroup_alias`
                 # which can no longer be null as of v8.
                 setattr(tile.aliased_data, child_nodegroup_alias, child_tile)
             else:
