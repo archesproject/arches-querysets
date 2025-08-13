@@ -14,7 +14,11 @@ from arches_querysets.rest_framework.serializers import (
     ArchesSingleNodegroupSerializer,
     ArchesTileSerializer,
 )
+from arches_querysets.utils.models import ensure_request
 from arches_querysets.utils.tests import GraphTestCase
+
+
+MUTABLE_PERMITTED_NODEGROUPS = set()
 
 
 class RestFrameworkTests(GraphTestCase):
@@ -27,6 +31,11 @@ class RestFrameworkTests(GraphTestCase):
         # Address flakiness.
         cls.resource_42.graph_publication = cls.resource_42.graph.publication
         cls.resource_42.save()
+
+    def patched_ensure_request(self, request, force_admin):
+        request.user.userprofile.viewable_nodegroups = {str(self.nodegroup_id)}
+        self.set_single_viewable_nodegroup(request, self.nodegroup_1.pk)
+        return ensure_request(request, force_admin)
 
     @patch("arches_querysets.rest_framework.serializers.get_nodegroup_alias_lookup")
     def test_derivation_of_nodegroup_aliases(self, mocked_util):
@@ -224,6 +233,29 @@ class RestFrameworkTests(GraphTestCase):
             QUERY_STRING="exclude_children=true",
         )
         self.assertNotContains(response, "datatypes_1_child")
+
+    @patch(
+        "arches.app.models.models.UserProfile.viewable_nodegroups",
+        MUTABLE_PERMITTED_NODEGROUPS,
+    )
+    def test_serializer_observes_nodegroup_permissions(self):
+        resource_serializer = ArchesResourceSerializer(graph_slug="datatype_lookups")
+        self.assertNotIn("datatypes_1", resource_serializer.data["aliased_data"])
+
+        # A TileSerializer where the topmost nodegroup is not permitted raises
+        tile_serializer = ArchesTileSerializer(
+            graph_slug="datatype_lookups", nodegroup_alias="datatypes_1"
+        )
+        with self.assertRaises(PermissionError):
+            tile_serializer.data
+
+        # Otherwise we just return whatever part of the tree we can.
+        MUTABLE_PERMITTED_NODEGROUPS.add(str(self.nodegroup_1.pk))
+        tile_serializer = ArchesTileSerializer(
+            graph_slug="datatype_lookups", nodegroup_alias="datatypes_1"
+        )
+        self.assertIn("number", tile_serializer.data["aliased_data"])
+        self.assertNotIn("datatypes_1_child", tile_serializer.data["aliased_data"])
 
     def test_filter_kwargs(self):
         node_alias = "string"
