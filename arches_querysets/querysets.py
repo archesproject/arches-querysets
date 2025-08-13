@@ -181,6 +181,11 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
                 )
             )
 
+        # arches_version==9.0.0
+        if arches_version < (8, 0):
+            msg = "arches-querysets requires all nodes to have an alias."
+            assert None not in alias_expressions, msg
+
         return qs.alias(**alias_expressions)
 
     def _prefetch_related_objects(self):

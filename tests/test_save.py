@@ -1,3 +1,4 @@
+from arches.app.models.models import TileModel
 from django.core.exceptions import ValidationError
 
 from arches_querysets.models import ResourceTileTree, TileTree
@@ -84,6 +85,22 @@ class SaveTileTests(GraphTestCase):
         msg = "Attempted to append to a populated cardinality-1 nodegroup"
         with self.assertRaisesMessage(RuntimeError, msg):
             self.resource_none.append_tile("datatypes_1")
+
+    def test_parent_tile_backfilled_on_child_tile_save(self):
+        self.resource_none.tilemodel_set.all().delete()
+        new_child_tile = TileTree(
+            resourceinstance=self.resource_none,
+            nodegroup=self.nodegroup_1_child,
+            number_child=4,
+            # TODO(arches_version==9.0.0): in Arches 8+, data={} can be removed.
+            data={},
+        )
+        new_child_tile.save()
+        # The parent property holds the richer TileTree
+        self.assertIsInstance(new_child_tile.parent, TileTree)
+        # The regular Django field is untouched (still a vanilla TileModel)
+        self.assertNotIsInstance(new_child_tile.parenttile, TileTree)
+        self.assertIsInstance(new_child_tile.parenttile, TileModel)
 
     def test_cardinality_error(self):
         with self.assertRaises(ValidationError) as ctx:
