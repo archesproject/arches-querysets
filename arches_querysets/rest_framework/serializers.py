@@ -526,6 +526,7 @@ class ArchesTileSerializer(serializers.ModelSerializer, NodeFetcherMixin):
 
     def to_internal_value(self, data):
         ret = super().to_internal_value(data)
+        # arches_version==9.0.0
         if arches_version < (8, 0):
             # Simulate field default provided by Arches 8+.
             ret["data"] = {}

@@ -92,7 +92,7 @@ class SaveTileTests(GraphTestCase):
             resourceinstance=self.resource_none,
             nodegroup=self.nodegroup_1_child,
             number_child=4,
-            # TODO(arches_version): in Arches 8+, data={} can be removed.
+            # TODO(arches_version==9.0.0): in Arches 8+, data={} can be removed.
             data={},
         )
         new_child_tile.save()
