@@ -29,7 +29,7 @@ class RestFrameworkTests(GraphTestCase):
         super().setUpClass()
         call_command("add_test_users", verbosity=0)
         # Address flakiness.
-        cls.resource_42.graph_publication = cls.resource_42.graph.publication
+        cls.resource_42.graph_publication_id = cls.resource_42.graph.publication_id
         cls.resource_42.save()
 
     def patched_ensure_request(self, request, force_admin):
