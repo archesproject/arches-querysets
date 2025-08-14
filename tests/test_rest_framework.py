@@ -59,11 +59,10 @@ class RestFrameworkTests(GraphTestCase):
         request_body = {"aliased_data": {"string_n": "create_value"}}
 
         # Anonymous user lacks editing permissions.
-        with self.assertLogs("django.request", level="WARNING"):
-            forbidden_response = self.client.post(
-                create_url, request_body, content_type="application/json"
-            )
-            self.assertEqual(forbidden_response.status_code, HTTPStatus.FORBIDDEN)
+        forbidden_response = self.client.post(
+            create_url, request_body, content_type="application/json"
+        )
+        self.assertEqual(forbidden_response.status_code, HTTPStatus.FORBIDDEN)
 
         # Dev user can edit.
         self.client.login(username="dev", password="dev")
@@ -131,10 +130,9 @@ class RestFrameworkTests(GraphTestCase):
         )
         self.client.login(username="dev", password="dev")
         request_body = {"aliased_data": {"datatypes_1": None}}
-        with self.assertLogs("django.request", level="WARNING"):
-            response = self.client.put(
-                update_url, request_body, content_type="application/json"
-            )
+        response = self.client.put(
+            update_url, request_body, content_type="application/json"
+        )
         self.assertContains(
             response,
             "Graph Has Different Publication",
@@ -298,4 +296,25 @@ class RestFrameworkTests(GraphTestCase):
         self.assertEqual(
             response.json()["results"][0]["resourceinstance"],
             str(self.resource_none.pk),
+        )
+
+    def test_bogus_graph_slug(self):
+        response = self.client.get(
+            reverse("arches_querysets:api-resources", kwargs={"graph": "bogus"})
+        )
+        self.assertContains(
+            response,
+            "No nodes found for graph slug",
+            status_code=HTTPStatus.BAD_REQUEST,
+        )
+        response = self.client.get(
+            reverse(
+                "arches_querysets:api-tiles",
+                kwargs={"graph": "bogus", "nodegroup_alias": "bogus"},
+            )
+        )
+        self.assertContains(
+            response,
+            "No nodes found for graph slug",
+            status_code=HTTPStatus.BAD_REQUEST,
         )

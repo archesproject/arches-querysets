@@ -62,6 +62,9 @@ CACHES = {
 }
 
 LOGGING["loggers"]["arches"]["level"] = "ERROR"
+# Unlike core arches, where views call other views, and thus warning-level logs are
+# interesting to hear about, just set this to ERROR to avoid self.assertLogs() all over.
+LOGGING["loggers"]["django.request"]["level"] = "ERROR"
 
 ELASTICSEARCH_PREFIX = "test"
 
