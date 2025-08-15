@@ -5,7 +5,7 @@ from operator import attrgetter
 
 from django.core.exceptions import ValidationError
 from django.db import ProgrammingError, transaction
-from django.db.models import F
+from django.db.models import F, Q
 from django.utils.translation import get_language, gettext as _
 
 from arches import VERSION as arches_version
@@ -46,7 +46,6 @@ class TileTreeOperation:
         # arches==9.0.0, replace these attributes by simply reading from
         # self.request.user.userprofile, which uses @cached_property as of Arches 8.1.
         # Store off these properties since they are expensive.
-        # self.viewable_nodegroups: set[str] = self.request.user.userprofile.viewable_nodegroups
         self.editable_nodegroups: set[str] = (
             self.request.user.userprofile.editable_nodegroups
         )
@@ -65,10 +64,14 @@ class TileTreeOperation:
             self.resourceid = self.entry.resourceinstance_id
             # TODO: write perms, but don't falsify self.new_resource_created
             self.nodegroups = get_nodegroups_here_and_below(self.entry.nodegroup)
-            existing_tiles = entry.__class__.objects.filter(
-                resourceinstance_id=self.resourceid,
-                nodegroup_id__in=[ng.pk for ng in self.nodegroups],
-            ).order_by("sortorder")
+            existing_tiles = (
+                entry.__class__.objects.filter(
+                    resourceinstance_id=self.resourceid,
+                    nodegroup_id__in=[ng.pk for ng in self.nodegroups],
+                )
+                .select_related("nodegroup")
+                .order_by("sortorder")
+            )
             # arches_version==9.0.0
             if arches_version < (8, 0):
                 # Cannot supply this too early, as nodegroup might be included
@@ -83,41 +86,37 @@ class TileTreeOperation:
         self.grouping_nodes_by_nodegroup_id = self._get_grouping_node_lookup()
         self.existing_tiles_by_nodegroup_alias = defaultdict(list)
         for tile in existing_tiles:
-            self.existing_tiles_by_nodegroup_alias[tile.find_nodegroup_alias()].append(
-                tile
-            )
+            alias = tile.find_nodegroup_alias(self.grouping_nodes_by_nodegroup_id)
+            self.existing_tiles_by_nodegroup_alias[alias].append(tile)
         self.new_resource_created = bool(existing_tiles)
 
     def _get_grouping_node_lookup(self):
-        from arches_querysets.models import ResourceTileTree, TileTree
+        from arches_querysets.models import TileTree
 
-        lookup = {}
-        if not self.entry._permitted_nodes:
-            self.entry._permitted_nodes = Node.objects.filter(
-                nodegroup__in=self.editable_nodegroups
-            )
-        if isinstance(self.entry, ResourceTileTree):
-            for node in self.entry._permitted_nodes:
-                if node.pk == node.nodegroup_id:
-                    lookup[node.pk] = node
-        elif isinstance(self.entry, TileTree):
-            for nodegroup in self.nodegroups:
-                # arches_version==9.0.0
-                if arches_version >= (8, 0):
-                    if nodegroup.grouping_node in self.entry._permitted_nodes:
-                        lookup[nodegroup.pk] = nodegroup.grouping_node
-                else:
-                    for node in nodegroup.node_set.all():
-                        if (
-                            node.pk == node.nodegroup_id
-                            and node in self.entry._permitted_nodes
-                        ):
-                            lookup[node.pk] = node
-                            break
+        if isinstance(self.entry, TileTree):
+            graph = self.entry.resourceinstance.graph
         else:
-            raise TypeError
-
-        return lookup
+            graph = self.entry.graph
+        filters = Q(pk=F("nodegroup_id"), graph__slug=graph.slug)
+        # arches_version==9.0.0
+        if arches_version >= (8, 0):
+            filters &= Q(source_identifier=None)
+            return {
+                node.pk: node
+                for node in Node.objects.filter(filters).select_related(
+                    "nodegroup__grouping_node__nodegroup__parentnodegroup"
+                )
+            }
+        else:
+            ret = {
+                node.pk: node
+                for node in Node.objects.filter(filters).select_related(
+                    "nodegroup__parentnodegroup"
+                )
+            }
+            for node_id, node in ret.items():
+                node.nodegroup.grouping_node = ret[node_id]
+            return ret
 
     def validate_and_save_tiles(self):
         self.validate()
@@ -144,7 +143,7 @@ class TileTreeOperation:
         original_tile_data_by_tile_id = {}
         if isinstance(self.entry, TileModel):
             self._update_tile(
-                self.entry.nodegroup.grouping_node,
+                self.grouping_nodes_by_nodegroup_id[self.entry.nodegroup_id],
                 None,
                 original_tile_data_by_tile_id,
                 delete_siblings=False,
@@ -225,17 +224,11 @@ class TileTreeOperation:
                 children = tile.nodegroup.children.all()
             else:
                 children = tile.nodegroup.nodegroup_set.all()
-                for child_nodegroup in children:
-                    # TODO: Obvious N+1 problem here.
-                    grouping_node = (
-                        Node.objects.filter(pk=child_nodegroup.pk)
-                        .prefetch_related("nodegroup__node_set")
-                        .get()
-                    )
-                    child_nodegroup.grouping_node = grouping_node
             for child_nodegroup in children:
                 self._update_tile(
-                    grouping_node=child_nodegroup.grouping_node,
+                    grouping_node=self.grouping_nodes_by_nodegroup_id[
+                        child_nodegroup.pk
+                    ],
                     container=tile._incoming_tile,
                     original_tile_data_by_tile_id=original_tile_data_by_tile_id,
                     delete_siblings=delete_siblings,
@@ -395,7 +388,9 @@ class TileTreeOperation:
             for insert in self.to_insert
         ]
         update_proxies = list(
-            Tile.objects.filter(pk__in=[tile.pk for tile in self.to_update])
+            Tile.objects.filter(
+                pk__in=[tile.pk for tile in self.to_update]
+            ).prefetch_related("nodegroup__cardmodel_set")
         )
         upsert_proxies = insert_proxies + update_proxies
         delete_proxies = Tile.objects.filter(
@@ -562,7 +557,7 @@ class TileTreeOperation:
         aliases = []
         for widget_label_or_node_name in error_names:
             widget = CardXNodeXWidget.objects.filter(
-                node__in=self.entry._permitted_nodes,
+                node__in=self.entry._graph_nodes,
                 # Awkward due to I18n_JSON
                 label__contains={get_language(): widget_label_or_node_name},
             ).first()
@@ -570,7 +565,8 @@ class TileTreeOperation:
                 node = widget.node
             else:
                 node = Node.objects.filter(
-                    pk__in=self.entry._permitted_nodes, name=widget_label_or_node_name
+                    pk__in=self.entry._graph_nodes,
+                    name=widget_label_or_node_name,
                 ).first()
             if node:
                 aliases.append(node.alias)

@@ -14,7 +14,11 @@ from arches_querysets.rest_framework.serializers import (
     ArchesSingleNodegroupSerializer,
     ArchesTileSerializer,
 )
+from arches_querysets.utils.models import ensure_request
 from arches_querysets.utils.tests import GraphTestCase
+
+
+MUTABLE_PERMITTED_NODEGROUPS = set()
 
 
 class RestFrameworkTests(GraphTestCase):
@@ -24,23 +28,11 @@ class RestFrameworkTests(GraphTestCase):
     def setUpClass(cls):
         super().setUpClass()
         call_command("add_test_users", verbosity=0)
-        # Address flakiness.
-        cls.resource_42.graph_publication = cls.resource_42.graph.publication
-        cls.resource_42.save()
 
-    @patch("arches_querysets.rest_framework.serializers.get_nodegroup_alias_lookup")
-    def test_derivation_of_nodegroup_aliases(self, mocked_util):
-        """Querying nodegroup aliases should only be done once in the view layer,
-        not multiple times when building nested serializers. The serializer layer
-        still has fallback code to support scripts, see test_bind_data_to_serializer(),
-        but it shouldn't be called when using views.
-        """
-        self.client.get(
-            reverse(
-                "arches_querysets:api-resources", kwargs={"graph": "datatype_lookups"}
-            )
-        )
-        mocked_util.assert_not_called()
+    def patched_ensure_request(self, request, force_admin):
+        request.user.userprofile.viewable_nodegroups = {str(self.nodegroup_id)}
+        self.set_single_viewable_nodegroup(request, self.nodegroup_1.pk)
+        return ensure_request(request, force_admin)
 
     def test_create_tile_for_new_resource(self):
         create_url = reverse(
@@ -50,11 +42,10 @@ class RestFrameworkTests(GraphTestCase):
         request_body = {"aliased_data": {"string_n": "create_value"}}
 
         # Anonymous user lacks editing permissions.
-        with self.assertLogs("django.request", level="WARNING"):
-            forbidden_response = self.client.post(
-                create_url, request_body, content_type="application/json"
-            )
-            self.assertEqual(forbidden_response.status_code, HTTPStatus.FORBIDDEN)
+        forbidden_response = self.client.post(
+            create_url, request_body, content_type="application/json"
+        )
+        self.assertEqual(forbidden_response.status_code, HTTPStatus.FORBIDDEN)
 
         # Dev user can edit.
         self.client.login(username="dev", password="dev")
@@ -122,10 +113,9 @@ class RestFrameworkTests(GraphTestCase):
         )
         self.client.login(username="dev", password="dev")
         request_body = {"aliased_data": {"datatypes_1": None}}
-        with self.assertLogs("django.request", level="WARNING"):
-            response = self.client.put(
-                update_url, request_body, content_type="application/json"
-            )
+        response = self.client.put(
+            update_url, request_body, content_type="application/json"
+        )
         self.assertContains(
             response,
             "Graph Has Different Publication",
@@ -225,6 +215,29 @@ class RestFrameworkTests(GraphTestCase):
         )
         self.assertNotContains(response, "datatypes_1_child")
 
+    @patch(
+        "arches.app.models.models.UserProfile.viewable_nodegroups",
+        MUTABLE_PERMITTED_NODEGROUPS,
+    )
+    def test_serializer_observes_nodegroup_permissions(self):
+        resource_serializer = ArchesResourceSerializer(graph_slug="datatype_lookups")
+        self.assertNotIn("datatypes_1", resource_serializer.data["aliased_data"])
+
+        # A TileSerializer where the topmost nodegroup is not permitted raises
+        tile_serializer = ArchesTileSerializer(
+            graph_slug="datatype_lookups", nodegroup_alias="datatypes_1"
+        )
+        with self.assertRaises(PermissionError):
+            tile_serializer.data
+
+        # Otherwise we just return whatever part of the tree we can.
+        MUTABLE_PERMITTED_NODEGROUPS.add(str(self.nodegroup_1.pk))
+        tile_serializer = ArchesTileSerializer(
+            graph_slug="datatype_lookups", nodegroup_alias="datatypes_1"
+        )
+        self.assertIn("number", tile_serializer.data["aliased_data"])
+        self.assertNotIn("datatypes_1_child", tile_serializer.data["aliased_data"])
+
     def test_filter_kwargs(self):
         node_alias = "string"
 
@@ -267,3 +280,117 @@ class RestFrameworkTests(GraphTestCase):
             response.json()["results"][0]["resourceinstance"],
             str(self.resource_none.pk),
         )
+
+    def test_bogus_graph_slug(self):
+        response = self.client.get(
+            reverse("arches_querysets:api-resources", kwargs={"graph": "bogus"})
+        )
+        self.assertContains(
+            response,
+            "No nodes found for graph slug",
+            status_code=HTTPStatus.BAD_REQUEST,
+        )
+        response = self.client.get(
+            reverse(
+                "arches_querysets:api-tiles",
+                kwargs={"graph": "bogus", "nodegroup_alias": "bogus"},
+            )
+        )
+        self.assertContains(
+            response,
+            "No nodes found for graph slug",
+            status_code=HTTPStatus.BAD_REQUEST,
+        )
+
+
+class RestFrameworkPerformanceTests(GraphTestCase):
+    test_child_nodegroups = True
+
+    @patch("arches_querysets.rest_framework.serializers.get_nodegroup_alias_lookup")
+    def test_derivation_of_nodegroup_aliases(self, mocked_util):
+        """Querying nodegroup aliases should only be done once in the view layer,
+        not multiple times when building nested serializers. The serializer layer
+        still has fallback code to support scripts, see test_bind_data_to_serializer(),
+        but it shouldn't be called when using views.
+        """
+        self.client.get(
+            reverse(
+                "arches_querysets:api-resources", kwargs={"graph": "datatype_lookups"}
+            )
+        )
+        mocked_util.assert_not_called()
+
+    def test_resource_list_view_performance(self):
+        # 1: auth
+        # 2: auth groups
+        # 3: node alias lookup in get_tiles()
+        # 4-16: PerformanceTests.test_get_graph_objects()
+        # 17: resource count (paginator)
+        # 18: select resources limit 500
+        # 19: tile depth 1
+        # 20: resourcexresource depth 1
+        # 21: tile depth 2
+        # 22: resourcexresource depth 2
+        # 23: tile depth 3: none!
+        # 24: userprofile
+        # 25-29: arches perms (BUG: core arches)
+        with self.assertNumQueries(29):
+            response = self.client.get(
+                reverse(
+                    "arches_querysets:api-resources",
+                    kwargs={"graph": "datatype_lookups"},
+                ),
+                # Some datatypes are inefficient in fetching data for display values,
+                # e.g. nodes, so make sure we're getting the resource with only Nones
+                QUERY_STRING="aliased_data__node_value__isnull=true",
+            )
+        self.assertContains(response, "datatypes_1_child", status_code=HTTPStatus.OK)
+        self.assertEqual(response.json()["count"], 1)
+        node_alias = "node_value"
+        top_tile = response.json()["results"][0]["aliased_data"]["datatypes_1"]
+        self.assertIsNone(top_tile["aliased_data"][node_alias]["node_value"])
+
+    def test_tile_list_view_performance(self):
+        # 1: auth
+        # 2: auth groups
+        # 3: node alias lookup in get_tiles()
+        # 4-16: PerformanceTests.test_get_graph_objects()
+        # 17: tile count (paginator)
+        # 18: select tiles limit 500
+        # 19: resourcexresource depth 1
+        # 20: tile depth 2
+        # 21: resourcexresource depth 2
+        # 22: tile depth 3: none!
+        # 23: userprofile
+        # 24-28: arches perms (BUG: core arches)
+        with self.assertNumQueries(28):
+            response = self.client.get(
+                reverse(
+                    "arches_querysets:api-tiles",
+                    kwargs={
+                        "graph": "datatype_lookups",
+                        "nodegroup_alias": "datatypes_1",
+                    },
+                ),
+                # Some datatypes are inefficient in fetching data for display values,
+                # e.g. nodes, so make sure we're getting the resource with only Nones
+                QUERY_STRING="aliased_data__node_value__isnull=true",
+            )
+        self.assertContains(response, "datatypes_1_child", status_code=HTTPStatus.OK)
+        self.assertEqual(response.json()["count"], 1)
+        node_alias = "node_value"
+        top_tile = response.json()["results"][0]
+        self.assertIsNone(top_tile["aliased_data"][node_alias]["node_value"])
+
+    def test_resource_blank_view_performance(self):
+        # 1-7: perms
+        # 8: get_nodegroup_alias_lookup()
+        # 9-12: NodeFetcherMixin._find_graph_nodes()
+        with self.assertNumQueries(12):
+            response = self.client.get(
+                reverse(
+                    "arches_querysets:api-resource-blank",
+                    kwargs={"graph": "datatype_lookups"},
+                )
+            )
+        self.assertContains(response, "datatypes_1_child")

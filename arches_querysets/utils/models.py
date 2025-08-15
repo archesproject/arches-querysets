@@ -104,22 +104,11 @@ def get_invalid_aliases(instance_or_class):
     )
 
 
-def generate_node_alias_expressions(nodes, *, defer, only, model):
-    if defer and only and (overlap := defer.intersection(only)):
-        raise ValueError(f"Got intersecting defer/only nodes: {overlap}")
+def generate_node_alias_expressions(model, nodes):
     alias_expressions = {}
     invalid_names = get_invalid_aliases(model)
 
-    queried_nodes = []
     for node in nodes:
-        if node.datatype == "semantic":
-            continue
-        if node.nodegroup_id is None:
-            continue
-        if getattr(node, "source_identifier_id", None):
-            continue
-        if (defer and node.alias in defer) or (only and node.alias not in only):
-            continue
         alias = node.alias
         if node.alias in invalid_names:
             # TODO (Arches 8.1): determine reserved namespace for node aliases
@@ -132,12 +121,11 @@ def generate_node_alias_expressions(nodes, *, defer, only, model):
         else:
             raise ValueError
         alias_expressions[alias] = tile_values_query
-        queried_nodes.append(node)
 
     if not alias_expressions:
         raise ValueError("All fields were excluded.")
 
-    return queried_nodes, alias_expressions
+    return alias_expressions
 
 
 def pop_arches_model_kwargs(kwargs, model_fields):
@@ -153,7 +141,7 @@ def pop_arches_model_kwargs(kwargs, model_fields):
     return arches_model_data, without_model_data
 
 
-def get_tile_values_for_resource(node, permitted_nodes):
+def get_tile_values_for_resource(node, graph_nodes):
     """
     Return a tile values query expression for use in a ResourceTileTreeQuerySet.
 
@@ -162,7 +150,7 @@ def get_tile_values_for_resource(node, permitted_nodes):
     multiple tiles for cardinality-1 nodegroups might appear if there
     are cardinality-N parents anywhere.
     """
-    many = any_nodegroup_in_hierarchy_is_cardinality_n(node.nodegroup, permitted_nodes)
+    many = any_nodegroup_in_hierarchy_is_cardinality_n(node.nodegroup, graph_nodes)
     expression = get_node_value_expression(node, many)
     tile_query = (
         TileModel.objects.filter(
@@ -210,7 +198,7 @@ def get_nodegroups_here_and_below(start_nodegroup):
             children_attr = nodegroup.children
         else:
             children_attr = nodegroup.nodegroup_set
-        for child_nodegroup in children_attr.all():
+        for child_nodegroup in children_attr.prefetch_related("node_set__nodegroup"):
             accumulate(child_nodegroup)
 
     accumulate(start_nodegroup)
@@ -232,11 +220,11 @@ def filter_nodes_by_highest_parent(nodes, aliases):
     return filtered_nodes
 
 
-def any_nodegroup_in_hierarchy_is_cardinality_n(nodegroup, permitted_nodes):
+def any_nodegroup_in_hierarchy_is_cardinality_n(nodegroup, graph_nodes):
     # Avoid verbose prefetching by just building a lookup locally.
     parent_nodegroup_lookup = {
         node.nodegroup.parentnodegroup_id: node.nodegroup.parentnodegroup
-        for node in permitted_nodes
+        for node in graph_nodes
         if node.nodegroup
     }
     cardinality_n_found = False
@@ -273,17 +261,17 @@ def append_tiles_recursively(resource_or_tile):
     if not vars(resource_or_tile.aliased_data):
         raise RuntimeError("aliased_data is empty")
 
-    for alias, tiles in vars(resource_or_tile.aliased_data).items():
-        if tiles in (None, []):
+    for alias, maybe_tiles in vars(resource_or_tile.aliased_data).items():
+        if maybe_tiles in (None, []):
             try:
                 resource_or_tile.append_tile(alias)
             except RuntimeError:  # not a nodegroup or nodegroup not permitted
                 continue
 
-            tiles = getattr(resource_or_tile.aliased_data, alias)
-        if not isinstance(tiles, list):
-            tiles = [tiles]
-        for tile in tiles:
+            maybe_tiles = getattr(resource_or_tile.aliased_data, alias)
+        if not isinstance(maybe_tiles, list):
+            maybe_tiles = [maybe_tiles]
+        for tile in maybe_tiles:
             if isinstance(tile, TileTree):
                 tile.fill_blanks()
 
@@ -292,8 +280,18 @@ def ensure_request(request, force_admin=False):
     """Allow server-side usage when not going through middleware."""
     if not request:
         request = HttpRequest()
-        if force_admin:
-            request.user = User.objects.get(username="admin")
-        else:
-            request.user = User.objects.get(username="anonymous")
+        username = "admin" if force_admin else "anonymous"
+        request.user = (
+            User.objects.filter(username=username).select_related("userprofile").get()
+        )
+
+    # arches_version==9.0.0: remove & fix call sites to check .viewable_nodegroups
+    try:
+        request.user.userprofile.cached_viewable_nodegroups
+    except AttributeError:
+        request.user.userprofile.cached_viewable_nodegroups = (
+            # This property is not cached by core until Arches 8.1
+            request.user.userprofile.viewable_nodegroups
+        )
+
     return request

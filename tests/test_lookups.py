@@ -156,6 +156,7 @@ class ResourceInstanceLookupTests(GenericLookupTests):
 class AggregateTests(GenericLookupTests):
     def test_number(self):
         # Edit the resource that usually has None in all nodes to have a value of 43.
+        # Fetch it since cls.resource_none was not fetched via get_tiles() :/
         resource2 = ResourceTileTree.get_tiles("datatype_lookups").get(
             pk=self.resource_none.pk
         )

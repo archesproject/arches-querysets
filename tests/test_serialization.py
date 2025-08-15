@@ -6,7 +6,7 @@ class SerializationTests(GraphTestCase):
     test_child_nodegroups = True
 
     def test_serialization_via_better_json_serializer(self):
-        dict_string = JSONSerializer().serialize(self.resource)
+        dict_string = JSONSerializer().serialize(self.resource_42)
         resource_dict = JSONDeserializer().deserialize(dict_string)
         # Django model fields are present.
         self.assertIn("graph_id", resource_dict)

@@ -1,6 +1,7 @@
 import datetime
 import uuid
 
+from django.db.models import F, OuterRef, prefetch_related_objects
 from django.test import TestCase
 
 from arches import VERSION as arches_version
@@ -59,8 +60,14 @@ class GraphTestCase(TestCase):
         graph_proxy.publish(user=None)
         cls.graph.publication = graph_proxy.publication
         for resource in [cls.resource_42, cls.resource_none]:
-            resource.publication = cls.graph.publication
-            resource.save()
+            resource.graph_publication = cls.graph.publication
+        # resource.save() might complain about differing publications, but
+        # we're trying to sync the publications here, so sidestep it.
+        ResourceInstance.objects.annotate(
+            graph_pub_id=Graph.objects.filter(resourceinstance=OuterRef("pk")).values(
+                "publication"
+            )[:1]
+        ).update(graph_publication=F("graph_pub_id"))
 
     @classmethod
     def create_graph(cls):
@@ -98,7 +105,9 @@ class GraphTestCase(TestCase):
 
     @classmethod
     def create_data_collecting_nodes(cls):
-        cls.datatypes = DDataType.objects.exclude(datatype="semantic")
+        cls.datatypes = DDataType.objects.exclude(datatype="semantic").select_related(
+            "defaultwidget"
+        )
         cls.data_nodes_1 = [
             Node(
                 datatype=datatype.pk,
@@ -124,6 +133,7 @@ class GraphTestCase(TestCase):
             for datatype in cls.datatypes
         ]
         cls.data_nodes = Node.objects.bulk_create(cls.data_nodes_1 + cls.data_nodes_n)
+        prefetch_related_objects(cls.data_nodes, "nodegroup")
 
         # Set each node as an attribute, e.g. self.string_node_n
         for node in cls.data_nodes:
@@ -139,7 +149,7 @@ class GraphTestCase(TestCase):
     @classmethod
     def create_edges(cls):
         def get_node_to_append_to(node):
-            if node.pk == node.nodegroup.pk:
+            if node.pk == node.nodegroup_id:
                 if node.nodegroup.parentnodegroup_id:
                     if node == cls.nodegroup_1_child:
                         return cls.grouping_node_1
@@ -163,7 +173,9 @@ class GraphTestCase(TestCase):
                 ontologyproperty="",
                 graph=cls.graph,
             )
-            for node in cls.graph.node_set.exclude(pk=cls.root_node.pk)
+            for node in cls.graph.node_set.exclude(pk=cls.root_node.pk).select_related(
+                "nodegroup"
+            )
         ]
         cls.edges = Edge.objects.bulk_create(edges)
 
@@ -197,7 +209,7 @@ class GraphTestCase(TestCase):
     def add_default_values_for_widgets(cls):
         node_widgets = CardXNodeXWidget.objects.filter(
             node__graph=cls.graph,
-        )
+        ).select_related("node")
         cls.default_vals_by_nodeid = {}
         cls.default_vals_by_datatype = {
             "non-localized-string": "The answer to life, the universe, and everything.",
@@ -242,17 +254,32 @@ class GraphTestCase(TestCase):
 
     @classmethod
     def create_resources(cls):
-        cls.resource_42 = ResourceInstance.objects.create(
-            graph=cls.graph,
-            descriptors={"en": {"name": "Resource referencing 42"}},
-            name="Resource referencing 42",
-            graph_publication_id=cls.graph.publication_id,
-        )
+        if arches_version >= (8, 0):
+            from arches.app.models.models import ResourceInstanceLifecycleState
+
+            state = ResourceInstanceLifecycleState.objects.first()
+
+        resource_with_data_kwargs = {
+            "graph": cls.graph,
+            "descriptors": {"en": {"name": "Resource referencing 42"}},
+            "name": "Resource referencing 42",
+            "graph_publication_id": cls.graph.publication_id,
+        }
+        resource_without_data_kwargs = {
+            "graph": cls.graph,
+            "descriptors": {"en": {"name": "Resource referencing None"}},
+            "name": "Resource referencing None",
+            "graph_publication_id": cls.graph.publication_id,
+        }
+
+        # arches_version==9.0.0
+        if arches_version >= (8, 0):
+            resource_with_data_kwargs["resource_instance_lifecycle_state"] = state
+            resource_without_data_kwargs["resource_instance_lifecycle_state"] = state
+
+        cls.resource_42 = ResourceInstance.objects.create(**resource_with_data_kwargs)
         cls.resource_none = ResourceInstance.objects.create(
-            graph=cls.graph,
-            descriptors={"en": {"name": "Resource referencing None"}},
-            name="Resource referencing None",
-            graph_publication_id=cls.graph.publication_id,
+            **resource_without_data_kwargs
         )
 
     @classmethod
@@ -458,7 +485,9 @@ class GraphTestCase(TestCase):
             )
 
         Node.objects.bulk_create(cls.data_nodes)
-        cls.data_nodes = cls.graph.node_set.exclude(datatype="semantic")
+        cls.data_nodes = cls.graph.node_set.exclude(datatype="semantic").select_related(
+            "nodegroup"
+        )
         cls.data_nodes_1 = cls.graph.node_set.filter(nodegroup=cls.nodegroup_1).exclude(
             datatype="semantic"
         )
@@ -480,6 +509,18 @@ class GraphTestCase(TestCase):
             data={},
             parenttile=cls.cardinality_n_tile,
         )
+        cls.cardinality_1_child_tile_none = TileModel.objects.create(
+            nodegroup=cls.nodegroup_1_child,
+            resourceinstance=cls.resource_none,
+            data={},
+            parenttile=cls.cardinality_1_tile_none,
+        )
+        cls.cardinality_n_child_tile_none = TileModel.objects.create(
+            nodegroup=cls.nodegroup_n_child,
+            resourceinstance=cls.resource_none,
+            data={},
+            parenttile=cls.cardinality_n_tile_none,
+        )
 
         # Create data for the child non-localized-string node only.
         # TileModel.save() will initialize the other nodes to None.
@@ -498,9 +539,12 @@ class GraphTestCase(TestCase):
         }
         cls.cardinality_n_child_tile.save()
 
-        cls.resource = ResourceTileTree.get_tiles(
+        cls.resource_42 = ResourceTileTree.get_tiles(
             "datatype_lookups", as_representation=True
         ).get(pk=cls.resource_42.pk)
+        cls.resource_none = ResourceTileTree.get_tiles(
+            "datatype_lookups", as_representation=True
+        ).get(pk=cls.resource_none.pk)
 
     @classmethod
     def find_default_widget_id(cls, node, datatypes):
