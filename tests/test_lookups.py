@@ -2,7 +2,7 @@ from arches_querysets.models import ResourceTileTree, TileTree
 from arches_querysets.utils.tests import GraphTestCase
 
 
-class GenericLookupTests(GraphTestCase):
+class LookupTestCase(GraphTestCase):
     def setUp(self):
         self.resources = ResourceTileTree.get_tiles("datatype_lookups")
         self.tiles_1 = TileTree.get_tiles(
@@ -12,6 +12,8 @@ class GenericLookupTests(GraphTestCase):
             "datatype_lookups", nodegroup_alias="datatypes_n"
         )
 
+
+class GenericLookupTests(LookupTestCase):
     def test_cardinality_1(self):
         # Exact
         for lookup, value in [
@@ -71,8 +73,16 @@ class GenericLookupTests(GraphTestCase):
                 self.assertTrue(self.resources.values_list(node.alias))
                 self.assertTrue(self.tiles_n.values_list(node.alias))
 
+    def test_values_path_transforms(self):
+        self.assertTrue(
+            self.resources.values("resource_instance_list_alias__0__resourceId")
+        )
+        self.assertTrue(
+            self.resources.values_list("resource_instance_list_alias__0__resourceId")
+        )
 
-class NonLocalizedStringLookupTests(GenericLookupTests):
+
+class NonLocalizedStringLookupTests(LookupTestCase):
     def test_cardinality_1(self):
         self.assertTrue(
             self.resources.filter(non_localized_string_alias__contains="forty")
@@ -96,7 +106,7 @@ class NonLocalizedStringLookupTests(GenericLookupTests):
         )
 
 
-class LocalizedStringLookupTests(GenericLookupTests):
+class LocalizedStringLookupTests(LookupTestCase):
     def test_cardinality_1(self):
         for lookup, value in [
             ("string_alias__any_lang_startswith", "forty"),
@@ -138,7 +148,7 @@ class LocalizedStringLookupTests(GenericLookupTests):
                 self.assertFalse(self.resources.filter(**{lookup: value}))
 
 
-class ResourceInstanceLookupTests(GenericLookupTests):
+class ResourceInstanceLookupTests(LookupTestCase):
     def test_cardinality_1(self):
         for lookup, value in [
             ("resource_instance_alias__id", str(self.resource_42.pk)),
