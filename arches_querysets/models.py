@@ -649,7 +649,7 @@ class TileTree(TileModel, AliasedDataMixin):
         # this section moves the data over from self.data to self.provisionaledits if certain users permissions are in force
         # then self.data is restored from the previously saved tile data
 
-        oldprovisionalvalue = None
+        oldprovisionalvalue = None 
         newprovisionalvalue = None
         provisional_edit_log_details = None
         creating_new_tile = self._state.adding

@@ -51,3 +51,6 @@ dev = [
 
 [tool.setuptools.packages.find]
 include = ["arches_querysets*"]
+
+[tool.black]
+exclude = "build"
