@@ -45,7 +45,6 @@ You'll see a tree of tiles with nodegroup data grouped under an `"aliased_data"`
 <details>
 <summary>Example response</summary>
 
-Note that below "string", "number", "concept", etc. are node aliases.
 ```json
 GET /api/resource/datatype_lookups
 
@@ -68,23 +67,46 @@ Vary: Accept
                     "nodegroup": "c8d6ae9b-d9e4-4ecc-87ef-6183d84df305",
                     "parenttile": null,
                     "aliased_data": {
-                        "string": {
+                        "string_alias": {
                             "display_value": "forty-two",
                             "node_value": {
                                 "en": {
                                     "value": "forty-two",
                                     "direction": "ltr"
                                 }
-                            }
+                            },
+                            "details": []
                         },
-                        "number": {
+                        "number_alias": {
                             "display_value": "42",
-                            "node_value": 42
+                            "node_value": 42,
+                            "details": []
                         },
-                        "concept": {
-                            "display_value": "Arches",
+                        "concept_alias": {
                             "node_value": "d8c60bf4-e786-11e6-905a-b756ec83dad5",
-                            "details": {
+                            "display_value": "Arches",
+                            "details": [
+                                {
+                                    "concept_id": "00000000-0000-0000-0000-000000000001",
+                                    "language_id": "en",
+                                    "value": "Arches",
+                                    "valueid": "d8c60bf4-e786-11e6-905a-b756ec83dad5",
+                                    "valuetype_id": "prefLabel"
+                                }
+                            ]
+                        },
+                        ...
+                        "datatypes_1_child": {
+                            "tileid": "59f8fe01-79ea-4074-8839-d9ce91bfe24f",
+                            "resourceinstance": "1b4a6cb0-e9a2-45b2-824b-2216a9b73696",
+                            "nodegroup": "b83976d3-7bb7-45ae-b007-204bc2c8f07d",
+                            "parenttile": "0c1873c9-8d5c-4ff9-8478-7369dc1e741c",
+                            "aliased_data": {
+                                "non_localized_string_alias_child": {
+                                    "node_value": "child-1-value",
+                                    "display_value": "child-1-value",
+                                    "details": []
+                                }
                                 ...
 ```
 </details>
@@ -94,66 +116,66 @@ values directly rather than wrapping them under a `node_value` key.)
 - Inherit from the [generic views](https://github.com/archesproject/arches-querysets/blob/main/arches_querysets/rest_framework/generic_views.py) when composing your own routes to customize pagination, permissions, validation etc.
 
 #### Direct QuerySet usage
-This graph has nodes with aliases for each datatype, e.g. "string", with node values all referencing the number 42 in some way:
+This graph has nodes with aliases for each datatype, e.g. "string_alias", with node values all referencing the number 42 in some way:
 
 ```py
 In [1]: from pprint import pprint
 
 In [2]: objects = ResourceTileTree.get_tiles(graph_slug="datatype_lookups")
 
-In [3]: for result in objects.filter(string__any_lang_contains='two'):
+In [3]: for result in objects.filter(string_alias__any_lang_contains='two'):
     ...:     pprint(result)
     ...:     pprint(result.aliased_data.datatypes_1.aliased_data)
 
-<ResourceTileTree: Datatype Lookups: Resource referencing 42 (486412dd-fed8-45b4-a0e0-5cd738f0eaeb)>
-AliasedData(string={'en': {'direction': 'ltr', 'value': 'forty-two'}},
-            number=42,
-            concept=<Value: Value object (d8c60bf4-e786-11e6-905a-b756ec83dad5)>,
-            concept_list=[<Value: Value object (d8c60bf4-e786-11e6-905a-b756ec83dad5)>],
-            date='2042-04-02',
-            edtf=None,
-            annotation=None,
-            url={'url': 'http://www.42.com/', 'url_label': '42.com'},
-            resource_instance=<ResourceInstance: Datatype Lookups: Resource referencing 42 (486412dd-fed8-45b4-a0e0-5cd738f0eaeb)>,
-            resource_instance_list=[<ResourceInstance: Datatype Lookups: Resource referencing 42 (486412dd-fed8-45b4-a0e0-5cd738f0eaeb)>],
-            boolean=True,
-            domain_value=None,
-            domain_value_list=None,
-            non_localized_string='forty-two',
-            geojson_feature_collection=None,
-            file_list=[{'accepted': True,
-                        'altText': {'en': {'direction': 'ltr',
-                                           'value': 'Illustration of recent '
-                                                    'accessibility '
-                                                    'improvements'}},
-                        'attribution': {'en': {'direction': 'ltr',
-                                               'value': 'Arches'}},
-                        'content': 'blob:http://localhost:8000/8cf874b3-d84d-4e45-bd32-419dc2fcedeb',
-                        'description': {'en': {'direction': 'ltr',
-                                               'value': 'Recent versions of '
-                                                        'arches have 42 '
-                                                        'improved '
-                                                        'accessibility '
-                                                        'characteristics.'}},
-                        'file_id': '11e5c7d2-6e31-4a7a-af74-25e6064ab40c',
-                        'height': 2042,
-                        'index': 0,
-                        'lastModified': 1723503486969,
-                        'name': '42_accessibility_improvements.png',
-                        'size': 2042,
-                        'status': 'added',
-                        'title': {'en': {'direction': 'ltr',
-                                         'value': '42 Accessibility '
-                                                  'Improvements'}},
-                        'type': 'image/png',
-                        'url': 'http://www.archesproject.org/blog/static/42.png',
-                        'width': 2042}],
-            node_value='8368dbc8-7cbc-4080-8623-46c928f011b8')
-{'en': {'direction': 'ltr', 'value': 'forty-two'}}
+AliasedData(concept_alias=<Value: Value object (d8c60bf4-e786-11e6-905a-b756ec83dad5)>,
+            geojson_feature_collection_alias=None,
+            concept_list_alias=[<Value: Value object (d8c60bf4-e786-11e6-905a-b756ec83dad5)>],
+            number_alias=42,
+            resource_instance_alias=<ResourceInstance: Datatype Lookups: Resource referencing 42 (1b4a6cb0-e9a2-45b2-824b-2216a9b73696)>,
+            resource_instance_list_alias=[<ResourceInstance: Datatype Lookups: Resource referencing 42 (1b4a6cb0-e9a2-45b2-824b-2216a9b73696)>],
+            file_list_alias=[{'accepted': True,
+                              'altText': {'en': {'direction': 'ltr',
+                                                 'value': 'Illustration of '
+                                                          'recent '
+                                                          'accessibility '
+                                                          'improvements'}},
+                              'attribution': {'en': {'direction': 'ltr',
+                                                     'value': 'Arches'}},
+                              'content': 'blob:http://localhost:8000/bd397baf-2121-48b5-8b07-48c2194f8c2e',
+                              'description': {'en': {'direction': 'ltr',
+                                                     'value': 'Recent versions '
+                                                              'of arches have '
+                                                              '42 improved '
+                                                              'accessibility '
+                                                              'characteristics.'}},
+                              'file_id': '522c5d07-750b-48bb-b313-e26d32f1fa7a',
+                              'height': 2042,
+                              'index': 0,
+                              'lastModified': 1723503486969,
+                              'name': '42_accessibility_improvements.png',
+                              'size': 2042,
+                              'status': 'added',
+                              'title': {'en': {'direction': 'ltr',
+                                               'value': '42 Accessibility '
+                                                        'Improvements'}},
+                              'type': 'image/png',
+                              'url': 'http://www.archesproject.org/blog/static/42.png',
+                              'width': 2042}],
+            date_alias='2042-04-02',
+            string_alias={'en': {'direction': 'ltr', 'value': 'forty-two'}},
+            domain_value_alias=None,
+            domain_value_list_alias=None,
+            boolean_alias=True,
+            annotation_alias=None,
+            edtf_alias=None,
+            url_alias={'url': 'http://www.42.com/', 'url_label': '42.com'},
+            non_localized_string_alias='forty-two',
+            node_value_alias='0c1873c9-8d5c-4ff9-8478-7369dc1e741c',
+            datatypes_1_child=<TileTree: datatypes_1_child (59f8fe01-79ea-4074-8839-d9ce91bfe24f)>)
 
-In [3]: result.aliased_data.datatypes_1.aliased_data.string = 'new value'
+In [3]: result.aliased_data.datatypes_1.aliased_data.string_alias = 'new value'
 
-In [4]: result.save()
+In [4]: result.save(force_admin=True)
 ```
 
 ### How would this help an Arches developer?
@@ -204,7 +226,7 @@ Factors differentiating the arches-querysets approach include:
         - pagination
         - migrations
         - registering custom SQL lookups
-- Reduce drift against core Arches development: validation traffic still routed through core arches
+- Reduce drift against core Arches development: validation traffic still routed through core arches python methods
 - Fully dynamic:
     - does not require declaring "well-known" models
     - does not require database migrations

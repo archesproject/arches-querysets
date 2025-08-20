@@ -11,7 +11,7 @@ class SerializationTests(GraphTestCase):
         tile_dict = resource_dict["aliased_data"]["datatypes_1"]
         self.assertIn("nodegroup_id", tile_dict)
         # Node values are present.
-        self.assertIn("non_localized_string", tile_dict["aliased_data"])
+        self.assertIn("non_localized_string_alias", tile_dict["aliased_data"])
         # Special properties are not present.
         self.assertNotIn("data", tile_dict)
         self.assertNotIn("parent", tile_dict)
