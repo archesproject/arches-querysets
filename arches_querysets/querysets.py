@@ -337,6 +337,7 @@ class ResourceTileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
         resource_ids=None,
         as_representation=False,
         nodes=None,
+        depth=20,
     ):
         """Aliases a ResourceTileTreeQuerySet with tile data unpacked
         and mapped onto nodegroup aliases, e.g.:
@@ -427,6 +428,7 @@ class ResourceTileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
                         as_representation=as_representation,
                         nodes=nodes,
                         graph_query=graph_query,
+                        depth=depth,
                     ),
                     to_attr="_tile_trees",
                 ),
