@@ -37,7 +37,7 @@ class RestFrameworkTests(GraphTestCase):
             "arches_querysets:api-tiles",
             kwargs={"graph": "datatype_lookups", "nodegroup_alias": "datatypes_n"},
         )
-        request_body = {"aliased_data": {"string_n": "create_value"}}
+        request_body = {"aliased_data": {"string_alias_n": "create_value"}}
 
         # Anonymous user lacks editing permissions.
         forbidden_response = self.client.post(
@@ -55,7 +55,7 @@ class RestFrameworkTests(GraphTestCase):
         self.assertEqual(response.status_code, HTTPStatus.CREATED)
         self.assertIn("aliased_data", response.json())
         self.assertEqual(
-            response.json()["aliased_data"]["string_n"],
+            response.json()["aliased_data"]["string_alias_n"],
             {
                 "display_value": "create_value",
                 "node_value": {
@@ -81,7 +81,7 @@ class RestFrameworkTests(GraphTestCase):
             kwargs={"graph": "datatype_lookups", "nodegroup_alias": "datatypes_n"},
         )
         request_body = {
-            "aliased_data": {"string_n": "create_value"},
+            "aliased_data": {"string_alias_n": "create_value"},
             "resourceinstance": str(self.resource_42.pk),
         }
         self.client.login(username="dev", password="dev")
@@ -91,7 +91,7 @@ class RestFrameworkTests(GraphTestCase):
         self.assertEqual(response.status_code, HTTPStatus.CREATED)
         self.assertEqual(response.json()["resourceinstance"], str(self.resource_42.pk))
         self.assertEqual(
-            response.json()["aliased_data"]["string_n"],
+            response.json()["aliased_data"]["string_alias_n"],
             {
                 "display_value": "create_value",
                 "node_value": {
@@ -125,9 +125,9 @@ class RestFrameworkTests(GraphTestCase):
         self.assertIsNone(serializer.data["resourceinstanceid"])
         # Default values are stocked.
         self.assertEqual(
-            serializer.data["aliased_data"]["datatypes_1"]["aliased_data"]["number"][
-                "node_value"
-            ],
+            serializer.data["aliased_data"]["datatypes_1"]["aliased_data"][
+                "number_alias"
+            ]["node_value"],
             7,
         )
 
@@ -137,7 +137,9 @@ class RestFrameworkTests(GraphTestCase):
         )
         self.assertIsNone(serializer.data["tileid"])
         # Default values are stocked.
-        self.assertEqual(serializer.data["aliased_data"]["number"]["node_value"], 7)
+        self.assertEqual(
+            serializer.data["aliased_data"]["number_alias"]["node_value"], 7
+        )
 
     def test_bind_data_to_serializer(self):
         # Get some default data from the serializer.
@@ -233,11 +235,11 @@ class RestFrameworkTests(GraphTestCase):
         tile_serializer = ArchesTileSerializer(
             graph_slug="datatype_lookups", nodegroup_alias="datatypes_1"
         )
-        self.assertIn("number", tile_serializer.data["aliased_data"])
+        self.assertIn("number_alias", tile_serializer.data["aliased_data"])
         self.assertNotIn("datatypes_1_child", tile_serializer.data["aliased_data"])
 
     def test_filter_kwargs(self):
-        node_alias = "string"
+        node_alias = "string_alias"
 
         response = self.client.get(
             reverse(
@@ -265,7 +267,7 @@ class RestFrameworkTests(GraphTestCase):
             response.json()["results"][0]["resourceinstance"], str(self.resource_42.pk)
         )
 
-        node_alias = "string_n"
+        node_alias = "string_alias_n"
         response = self.client.get(
             reverse(
                 "arches_querysets:api-tiles",
@@ -338,13 +340,12 @@ class RestFrameworkPerformanceTests(GraphTestCase):
                 ),
                 # Some datatypes are inefficient in fetching data for display values,
                 # e.g. nodes, so make sure we're getting the resource with only Nones
-                QUERY_STRING="aliased_data__node_value__isnull=true",
+                QUERY_STRING="aliased_data__number_alias__isnull=true",
             )
         self.assertContains(response, "datatypes_1_child", status_code=HTTPStatus.OK)
         self.assertEqual(response.json()["count"], 1)
-        node_alias = "node_value"
         top_tile = response.json()["results"][0]["aliased_data"]["datatypes_1"]
-        self.assertIsNone(top_tile["aliased_data"][node_alias]["node_value"])
+        self.assertIsNone(top_tile["aliased_data"]["number_alias"]["node_value"])
 
     def test_tile_list_view_performance(self):
         # 1: auth
@@ -370,13 +371,12 @@ class RestFrameworkPerformanceTests(GraphTestCase):
                 ),
                 # Some datatypes are inefficient in fetching data for display values,
                 # e.g. nodes, so make sure we're getting the resource with only Nones
-                QUERY_STRING="aliased_data__node_value__isnull=true",
+                QUERY_STRING="aliased_data__number_alias__isnull=true",
             )
         self.assertContains(response, "datatypes_1_child", status_code=HTTPStatus.OK)
         self.assertEqual(response.json()["count"], 1)
-        node_alias = "node_value"
         top_tile = response.json()["results"][0]
-        self.assertIsNone(top_tile["aliased_data"][node_alias]["node_value"])
+        self.assertIsNone(top_tile["aliased_data"]["number_alias"]["node_value"])
 
     def test_resource_blank_view_performance(self):
         # 1-7: perms
