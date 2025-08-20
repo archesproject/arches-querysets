@@ -45,7 +45,7 @@ class DatatypeRepresentationTests(GraphTestCase):
 
         # The representation is available on the nodegroup .aliased_data.
         for datatype, representation in display_values.items():
-            node_alias = datatype.replace("-", "_")
+            node_alias = datatype.replace("-", "_") + "_alias"
             for resource_data, resource_data_none, cardinality in [
                 (self.datatype_1.aliased_data, self.datatype_1_none.aliased_data, "1"),
                 (
@@ -100,7 +100,7 @@ class DatatypeRepresentationTests(GraphTestCase):
 
         # The details are available on the nodegroup .aliased_data.
         for datatype, details in detail_values.items():
-            node_alias = datatype.replace("-", "_")
+            node_alias = datatype.replace("-", "_") + "_alias"
             for resource_data, resource_data_none, cardinality in [
                 (self.datatype_1.aliased_data, self.datatype_1_none.aliased_data, "1"),
                 (
@@ -110,7 +110,7 @@ class DatatypeRepresentationTests(GraphTestCase):
                 ),
             ]:
                 lookup = node_alias if cardinality == "1" else node_alias + "_n"
-                if lookup == "node_value_n":
+                if lookup == "node_value_alias_n":
                     details = self.sample_data_n["node-value"]
                 with self.subTest(lookup=lookup):
                     value = getattr(resource_data, lookup)
@@ -149,7 +149,7 @@ class DatatypePythonTests(GraphTestCase):
 
         # The python value is available on the nodegroup .aliased_data.
         for datatype, python_value in python_values.items():
-            node_alias = datatype.replace("-", "_")
+            node_alias = datatype.replace("-", "_") + "_alias"
             for resource_data, resource_data_none, cardinality in [
                 (self.datatype_1.aliased_data, self.datatype_1_none.aliased_data, "1"),
                 (
@@ -159,7 +159,7 @@ class DatatypePythonTests(GraphTestCase):
                 ),
             ]:
                 lookup = node_alias if cardinality == "1" else node_alias + "_n"
-                if lookup == "node_value_n":
+                if lookup == "node_value_alias_n":
                     python_value = self.sample_data_n["node-value"]
                 with self.subTest(lookup=lookup):
                     value = getattr(resource_data, lookup)
@@ -170,7 +170,6 @@ class DatatypePythonTests(GraphTestCase):
 
 class DatatypeMethodTests(GraphTestCase):
     def test_transform_value_for_tile(self):
-        # Test that the transformation of values for tile works correctly.
         test_values = {
             # TODO - add more datatypes tests here.
             "file-list": [
