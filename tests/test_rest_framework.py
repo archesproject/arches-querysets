@@ -22,8 +22,6 @@ MUTABLE_PERMITTED_NODEGROUPS = set()
 
 
 class RestFrameworkTests(GraphTestCase):
-    test_child_nodegroups = True
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -304,8 +302,6 @@ class RestFrameworkTests(GraphTestCase):
 
 
 class RestFrameworkPerformanceTests(GraphTestCase):
-    test_child_nodegroups = True
-
     @patch("arches_querysets.rest_framework.serializers.get_nodegroup_alias_lookup")
     def test_derivation_of_nodegroup_aliases(self, mocked_util):
         """Querying nodegroup aliases should only be done once in the view layer,
