@@ -3,8 +3,6 @@ from arches_querysets.utils.tests import GraphTestCase
 
 
 class SerializationTests(GraphTestCase):
-    test_child_nodegroups = True
-
     def test_serialization_via_better_json_serializer(self):
         dict_string = JSONSerializer().serialize(self.resource_42)
         resource_dict = JSONDeserializer().deserialize(dict_string)
