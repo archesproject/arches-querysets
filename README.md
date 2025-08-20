@@ -32,6 +32,8 @@ urlpatterns.append(path("", include("arches_querysets.urls")))
 For developer install instructions, see the [Developer Setup](#developer-setup-for-contributing-to-the-arches-querysets-project) section below.
 
 ### Quickstart
+A [tutorial](docs/tutorial.ipynb) is included, but here's the quick version:
+
 ```shell
 python manage.py add_test_data
 python manage.py runserver
