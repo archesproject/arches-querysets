@@ -4,8 +4,6 @@ from arches_querysets.utils.tests import GraphTestCase
 
 
 class PerformanceTests(GraphTestCase):
-    test_child_nodegroups = True
-
     def test_get_graph_objects(self):
         # 1: graph
         # 2: graph -> node

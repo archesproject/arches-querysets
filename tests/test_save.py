@@ -5,8 +5,6 @@ from arches_querysets.utils.tests import GraphTestCase
 
 
 class SaveTileTests(GraphTestCase):
-    test_child_nodegroups = True
-
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
