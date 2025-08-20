@@ -9,18 +9,18 @@ class TileTreeOperationTests(GraphTestCase):
         request = ensure_request(None, force_admin=True)
         test_tiles = TileTree.get_tiles("datatype_lookups", "datatypes_1")
         entry_tile = test_tiles.get(pk=self.cardinality_1_tile.pk)
-        del entry_tile.aliased_data.boolean
+        del entry_tile.aliased_data.boolean_alias
         operation = TileTreeOperation(entry=entry_tile, request=request, partial=True)
         operation.validate()
         with self.assertRaises(AttributeError):
-            entry_tile.aliased_data.boolean
+            entry_tile.aliased_data.boolean_alias
 
     def test_full_update_resets_missing_nodes_to_default(self):
         request = ensure_request(None, force_admin=True)
         test_tiles = TileTree.get_tiles("datatype_lookups", "datatypes_1")
         entry_tile = test_tiles.get(pk=self.cardinality_1_tile.pk)
-        self.assertIs(entry_tile.aliased_data.boolean, True)
-        del entry_tile.aliased_data.boolean
+        self.assertIs(entry_tile.aliased_data.boolean_alias, True)
+        del entry_tile.aliased_data.boolean_alias
         operation = TileTreeOperation(entry=entry_tile, request=request, partial=False)
         operation.validate()
-        self.assertIs(entry_tile.aliased_data.boolean, False)
+        self.assertIs(entry_tile.aliased_data.boolean_alias, False)
