@@ -1,3 +1,5 @@
+import uuid
+
 from arches_querysets.models import ResourceTileTree, TileTree
 from arches_querysets.utils.tests import GraphTestCase
 
@@ -74,12 +76,17 @@ class GenericLookupTests(LookupTestCase):
                 self.assertTrue(self.tiles_n.values_list(node.alias))
 
     def test_values_path_transforms(self):
-        self.assertTrue(
-            self.resources.values("resource_instance_list_alias__0__resourceId")
+        resources = self.resources.exclude(resource_instance_list_alias=None)
+        values = resources.values("resource_instance_list_alias__0__resourceId")
+        uuid_val = values[0]["resource_instance_list_alias__0__resourceId"]
+        # Implicitly test the result is a uuid
+        uuid.UUID(uuid_val)
+
+        values = resources.values_list(
+            "resource_instance_list_alias__0__resourceId", flat=True
         )
-        self.assertTrue(
-            self.resources.values_list("resource_instance_list_alias__0__resourceId")
-        )
+        uuid_val = values[0]
+        uuid.UUID(uuid_val)
 
 
 class NonLocalizedStringLookupTests(LookupTestCase):

@@ -37,14 +37,13 @@ class NodeAliasValuesMixin:
                 and arg not in kwargs
             ):
                 # values() can promote aliases to annotations via **kwargs
-                kwargs_copy[field_name] = models.F(field_name)
+                kwargs_copy[arg] = models.F(arg)
                 args_copy.remove(arg)
         return super().values(*args_copy, **kwargs_copy)
 
     def values_list(self, *args, **kwargs):
         """Allow using a node_alias as a field name in a values_list() query."""
         qs = self
-        args_copy = list(set(args))
         for arg in args:
             field_name = arg.split(models.constants.LOOKUP_SEP)[0]
             if (
@@ -52,13 +51,8 @@ class NodeAliasValuesMixin:
                 and field_name not in qs.query.annotation_select
             ):
                 # values_list() cannot promote aliases via kwargs like annotate().
-                bumped_arg = models.constants.LOOKUP_SEP.join(
-                    [field_name, "for_values_list"]
-                )
-                qs = qs.annotate(**{bumped_arg: models.F(field_name)})
-                i = args_copy.index(arg)
-                args_copy[i] = bumped_arg
-        return models.QuerySet.values_list(qs, *args_copy, **kwargs)
+                qs = qs.annotate(**{arg: models.F(arg)})
+        return models.QuerySet.values_list(qs, *args, **kwargs)
 
     def aggregate(self, *args, **kwargs):
         """Handle the "promotion" of .alias() to .annotate() for .aggregate()."""
