@@ -1,3 +1,4 @@
+import uuid
 from collections import defaultdict
 from functools import partial
 
@@ -559,17 +560,12 @@ class ArchesTileSerializer(serializers.ModelSerializer, NodeFetcherMixin):
         super().__init__(instance, data, **kwargs)
         self._child_nodegroup_aliases = []
 
-    def to_representation(self, data):
-        """Prevent newly minted blank tiles from serializing with pk's."""
-        ret = super().to_representation(data)
-        if isinstance(data, TileTree):
-            if data._state.adding:
-                ret["tileid"] = None
-                ret["parenttile"] = None
-        return ret
-
     def to_internal_value(self, data):
         ret = super().to_internal_value(data)
+        # Provide a tileid here instead of via default=uuid.uuid4 on the field definition
+        # because we also have /blank routes that use this serializer.
+        if ret.get("tileid", object()) is None:
+            ret["tileid"] = uuid.uuid4()
         # arches_version==9.0.0
         if arches_version < (8, 0):
             # Simulate field default provided by Arches 8+.

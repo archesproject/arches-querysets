@@ -214,6 +214,8 @@ class TileTreeOperation:
                 if isinstance(container, TileModel):
                     new_tile.parenttile = container
                 new_tile.full_clean()
+                if new_tile.pk is None:
+                    new_tile.pk = uuid.uuid4()
                 to_insert.add(new_tile)
             else:
                 original_tile_data_by_tile_id[existing_tile.pk] = {**existing_tile.data}
