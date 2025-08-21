@@ -1,4 +1,5 @@
 import unittest
+import uuid
 from http import HTTPStatus
 from unittest.mock import patch
 
@@ -54,6 +55,7 @@ class RestFrameworkTests(GraphTestCase):
         # The response includes the context.
         self.assertEqual(response.status_code, HTTPStatus.CREATED)
         self.assertIn("aliased_data", response.json())
+        self.assertIsInstance(uuid.UUID(response.json()["tileid"]), uuid.UUID)
         self.assertEqual(
             response.json()["aliased_data"]["string_alias_n"],
             {
@@ -89,6 +91,7 @@ class RestFrameworkTests(GraphTestCase):
             create_url, request_body, content_type="application/json"
         )
         self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        self.assertIsInstance(uuid.UUID(response.json()["tileid"]), uuid.UUID)
         self.assertEqual(response.json()["resourceinstance"], str(self.resource_42.pk))
         self.assertEqual(
             response.json()["aliased_data"]["string_alias_n"],
@@ -96,6 +99,84 @@ class RestFrameworkTests(GraphTestCase):
                 "display_value": "create_value",
                 "node_value": {
                     "en": {"value": "create_value", "direction": "ltr"},
+                },
+                "details": [],
+            },
+        )
+
+    def test_create_nested_tiles_for_new_resource(self):
+        self.client.login(username="dev", password="dev")
+        create_url = reverse(
+            "arches_querysets:api-tiles",
+            kwargs={"graph": "datatype_lookups", "nodegroup_alias": "datatypes_1"},
+        )
+        request_body = {
+            "aliased_data": {
+                "string_alias": "create_value",
+                "datatypes_1_child": {
+                    "aliased_data": {"string_alias_child": "child_create_value"}
+                },
+            },
+        }
+
+        response = self.client.post(
+            create_url, request_body, content_type="application/json"
+        )
+
+        # The response includes the context.
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        self.assertIn("aliased_data", response.json())
+        self.assertIsInstance(uuid.UUID(response.json()["tileid"]), uuid.UUID)
+        parent_data = response.json()["aliased_data"]
+        self.assertEqual(
+            parent_data["datatypes_1_child"]["aliased_data"]["string_alias_child"],
+            {
+                "display_value": "child_create_value",
+                "node_value": {
+                    "en": {"value": "child_create_value", "direction": "ltr"},
+                },
+                "details": [],
+            },
+        )
+        self.assertEqual(response.status_code, HTTPStatus.CREATED, response.content)
+
+        self.assertSequenceEqual(
+            EditLog.objects.filter(
+                resourceinstanceid=response.json()["resourceinstance"],
+            )
+            .values_list("edittype", flat=True)
+            .order_by("edittype"),
+            ["create", "tile create", "tile create"],
+        )
+
+    def test_update_tile(self):
+        update_url = reverse(
+            "arches_querysets:api-tile",
+            kwargs={
+                "graph": "datatype_lookups",
+                "nodegroup_alias": "datatypes_1",
+                "pk": self.resource_42.aliased_data.datatypes_1.pk,
+            },
+        )
+        request_body = {
+            "aliased_data": {"string_alias": "update_value"},
+            "resourceinstance": str(self.resource_42.pk),
+        }
+        assert "tileid" not in request_body, "tileid is not required in update requests"
+
+        self.client.login(username="dev", password="dev")
+        response = self.client.patch(
+            update_url, request_body, content_type="application/json"
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK, response.json())
+        self.assertIsInstance(uuid.UUID(response.json()["tileid"]), uuid.UUID)
+        self.assertEqual(response.json()["resourceinstance"], str(self.resource_42.pk))
+        self.assertEqual(
+            response.json()["aliased_data"]["string_alias"],
+            {
+                "display_value": "update_value",
+                "node_value": {
+                    "en": {"value": "update_value", "direction": "ltr"},
                 },
                 "details": [],
             },
@@ -153,7 +234,17 @@ class RestFrameworkTests(GraphTestCase):
             data=static_data,
         )
         self.assertTrue(serializer.is_valid())
-        # serializer.save() etc
+
+        # Or, submit it to the API
+        self.client.login(username="dev", password="dev")
+        create_url = reverse(
+            "arches_querysets:api-tiles",
+            kwargs={"graph": "datatype_lookups", "nodegroup_alias": "datatypes_1"},
+        )
+        response = self.client.post(
+            create_url, serializer.data, content_type="application/json"
+        )
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
 
     def test_exclude_children_option(self):
         serializer = ArchesResourceSerializer(graph_slug="datatype_lookups")
