@@ -268,6 +268,15 @@ class RestFrameworkTests(GraphTestCase):
         )
         self.assertNotIn("datatypes_1_child", serializer.data["aliased_data"])
 
+    def test_blank_views_tile_id(self):
+        response = self.client.get(
+            reverse(
+                "arches_querysets:api-tile-blank",
+                kwargs={"graph": "datatype_lookups", "nodegroup_alias": "datatypes_1"},
+            )
+        )
+        self.assertIsNone(response.json()["tileid"])
+
     def test_blank_views_exclude_children_option(self):
         response = self.client.get(
             reverse(
