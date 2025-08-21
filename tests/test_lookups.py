@@ -41,9 +41,12 @@ class GenericLookupTests(GraphTestCase):
             ("non_localized_string_alias_n__contains", ["forty-two"]),
             ("date_alias_n__contains", ["2042-04-02"]),
             # better lookups for RI{list} below.
-            ("resource_instance_alias__0__resourceId", str(self.resource_42.pk)),
+            ("resource_instance_alias_n__0__0__resourceId", str(self.resource_42.pk)),
             # you likely want ids_contain, below.
-            ("resource_instance_list_alias__0__resourceId", str(self.resource_42.pk)),
+            (
+                "resource_instance_list_alias_n__0__0__resourceId",
+                str(self.resource_42.pk),
+            ),
             ("concept_alias_n__contains", [self.concept_value.pk]),
             # you likely want any_contains, below.
             ("concept_list_alias_n__0__contains", str(self.concept_value.pk)),
