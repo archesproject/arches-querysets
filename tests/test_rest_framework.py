@@ -315,6 +315,20 @@ class RestFrameworkTests(GraphTestCase):
         )
         self.assertNotContains(response, "datatypes_1_child")
 
+    def test_fill_blanks_option(self):
+        self.resource_42.tilemodel_set.all().delete()
+        response = self.client.get(
+            reverse(
+                "arches_querysets:api-resource",
+                kwargs={"graph": "datatype_lookups", "pk": str(self.resource_42.pk)},
+            ),
+            QUERY_STRING="fill_blanks=true",
+        )
+        parent_data = response.json()["aliased_data"]["datatypes_1"]
+        self.assertIsNone(parent_data["tileid"])
+        child_data = parent_data["aliased_data"]["dataypes_1_child"]
+        self.assertIsNone(child_data["tileid"])
+
     @patch(
         "arches.app.models.models.UserProfile.viewable_nodegroups",
         MUTABLE_PERMITTED_NODEGROUPS,
