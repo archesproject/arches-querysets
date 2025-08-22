@@ -149,6 +149,56 @@ class RestFrameworkTests(GraphTestCase):
             ["create", "tile create", "tile create"],
         )
 
+    @unittest.skipIf(
+        arches_version < (8, 0), reason="models Arches 8+ usage omitting graph"
+    )
+    def test_create_nested_tiles_for_new_resource_via_resource_serializer(self):
+        self.client.login(username="dev", password="dev")
+        create_url = reverse(
+            "arches_querysets:api-resources",
+            kwargs={"graph": "datatype_lookups"},
+        )
+        request_body = {
+            "aliased_data": {
+                "datatypes_1": {
+                    "aliased_data": {
+                        "string_alias": "create_value",
+                        "datatypes_1_child": {
+                            "aliased_data": {"string_alias_child": "child_create_value"}
+                        },
+                    },
+                },
+            },
+        }
+
+        response = self.client.post(
+            create_url, request_body, content_type="application/json"
+        )
+
+        # The response includes the context.
+        self.assertEqual(response.status_code, HTTPStatus.CREATED, response.json())
+        parent_data = response.json()["aliased_data"]["datatypes_1"]["aliased_data"]
+        self.assertEqual(
+            parent_data["datatypes_1_child"]["aliased_data"]["string_alias_child"],
+            {
+                "display_value": "child_create_value",
+                "node_value": {
+                    "en": {"value": "child_create_value", "direction": "ltr"},
+                },
+                "details": [],
+            },
+        )
+        self.assertEqual(response.status_code, HTTPStatus.CREATED, response.content)
+
+        self.assertSequenceEqual(
+            EditLog.objects.filter(
+                resourceinstanceid=response.json()["resourceinstanceid"],
+            )
+            .values_list("edittype", flat=True)
+            .order_by("edittype"),
+            ["create", "tile create", "tile create"],
+        )
+
     def test_update_tile(self):
         update_url = reverse(
             "arches_querysets:api-tile",
