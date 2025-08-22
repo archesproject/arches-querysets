@@ -191,6 +191,7 @@ class NodeFetcherMixin:
             "nodegroup_alias_lookup": nodegroup_alias_lookup
             or get_nodegroup_alias_lookup(graph_slug),
             "request": ensure_request(request),
+            "fill_blanks": False,
         }
 
 
@@ -559,6 +560,16 @@ class ArchesTileSerializer(serializers.ModelSerializer, NodeFetcherMixin):
         kwargs["context"] = context
         super().__init__(instance, data, **kwargs)
         self._child_nodegroup_aliases = []
+
+    def to_representation(self, data):
+        """Prevent newly minted blank tiles from serializing with pk's if the
+        fill_blanks option is in force."""
+        ret = super().to_representation(data)
+        if self.context["fill_blanks"] and isinstance(data, TileTree):
+            if data._state.adding:
+                ret["tileid"] = None
+                ret["parenttile"] = None
+        return ret
 
     def to_internal_value(self, data):
         ret = super().to_internal_value(data)

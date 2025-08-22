@@ -326,7 +326,7 @@ class RestFrameworkTests(GraphTestCase):
         )
         parent_data = response.json()["aliased_data"]["datatypes_1"]
         self.assertIsNone(parent_data["tileid"])
-        child_data = parent_data["aliased_data"]["dataypes_1_child"]
+        child_data = parent_data["aliased_data"]["datatypes_1_child"]
         self.assertIsNone(child_data["tileid"])
 
     @patch(
