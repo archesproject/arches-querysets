@@ -406,11 +406,12 @@ class TileTreeOperation:
         try:
             self._perform_transaction()
         except:
-            # Manually manage failures instead of using transaction.atomic(), see:
-            # https://github.com/archesproject/arches/issues/12318
-            # Don't want to run model delete() which *creates* edit log entries.
-            EditLog.objects.filter(resourceinstanceid=instance.pk).delete()
-            Resource.objects.filter(pk=instance.pk).delete()
+            if self.for_new_resource:
+                # Manually manage failures instead of using transaction.atomic(), see:
+                # https://github.com/archesproject/arches/issues/12318
+                # Don't want to run model delete() which *creates* edit log entries.
+                EditLog.objects.filter(resourceinstanceid=instance.pk).delete()
+                Resource.objects.filter(pk=instance.pk).delete()
             raise
 
     def _perform_transaction(self):
