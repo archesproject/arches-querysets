@@ -10,9 +10,7 @@ class AggregateTests(GraphTestCase):
 
         # Edit the resource that usually has None in all nodes to have a value of 43.
         # Fetch it since cls.resource_none was not fetched via get_tiles() :/
-        resource2 = ResourceTileTree.get_tiles("datatype_lookups").get(
-            pk=self.resource_none.pk
-        )
+        resource2 = self.resources.get(pk=self.resource_none.pk)
         resource2.aliased_data.datatypes_1.aliased_data.number_alias = 43
         resource2.aliased_data.datatypes_n[0].aliased_data.number_alias_n = 43
         resource2.save(force_admin=True)
