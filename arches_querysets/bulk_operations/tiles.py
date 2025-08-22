@@ -14,10 +14,10 @@ from arches.app.models.models import (
     EditLog,
     Language,
     Node,
-    Resource,
     ResourceInstance,
     TileModel,
 )
+from arches.app.models.resource import Resource
 from arches.app.models.tile import Tile, TileValidationError
 
 from arches_querysets.datatypes.datatypes import DataTypeFactory
