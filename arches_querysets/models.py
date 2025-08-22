@@ -100,12 +100,15 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
         permissions = (("no_access_to_resourceinstance", "No Access"),)
 
     def __init__(self, *args, **kwargs):
+        self._as_representation = kwargs.pop("__as_representation", False)
+        self._request = kwargs.pop("__request", None)
         arches_model_kwargs, other_kwargs = pop_arches_model_kwargs(
             kwargs, self._meta.get_fields()
         )
         super().__init__(*args, **other_kwargs)
-        self.aliased_data = AliasedData(**arches_model_kwargs)
-        self._as_representation = False
+        self.aliased_data = arches_model_kwargs.pop(
+            "aliased_data", None
+        ) or AliasedData(**arches_model_kwargs)
         self._sealed = False
 
     @property
@@ -143,6 +146,7 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
         ):
             raise ValidationError(_("Graph Has Different Publication"))
 
+        request = request or self._request
         self._save_aliased_data(
             request=request,
             index=index,
@@ -223,8 +227,12 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
         operation = TileTreeOperation(
             entry=self, request=request, partial=partial, save_kwargs=kwargs
         )
+        for_resource_create = not self.pk
+
         # This will also call ResourceInstance.save()
         operation.validate_and_save_tiles()
+        if for_resource_create:
+            self.pk = operation.resourceid
 
         # Run side effects trapped on Resource.save()
         proxy_resource = (
@@ -236,7 +244,7 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
         if index:
             proxy_resource.index()
 
-        if request:
+        if request and not for_resource_create:
             self.save_edit(user=request.user, transaction_id=operation.transaction_id)
 
         self.refresh_from_db(
