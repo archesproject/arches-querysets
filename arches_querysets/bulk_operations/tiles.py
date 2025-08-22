@@ -79,7 +79,7 @@ class TileTreeOperation:
                 # with the request and already instantiated to a fresh object.
                 grouping_node = [
                     node
-                    for node in entry.resourceinstance.graph.node_set.all()
+                    for node in entry.nodegroup.node_set.all()[0].graph.node_set.all()
                     if node.pk == node.nodegroup_id
                 ][0]
                 entry.nodegroup.grouping_node = grouping_node

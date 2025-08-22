@@ -149,6 +149,9 @@ class RestFrameworkTests(GraphTestCase):
             ["create", "tile create", "tile create"],
         )
 
+    @unittest.skipIf(
+        arches_version < (8, 0), reason="models Arches 8+ usage omitting graph"
+    )
     def test_create_nested_tiles_for_new_resource_via_resource_serializer(self):
         self.client.login(username="dev", password="dev")
         create_url = reverse(
