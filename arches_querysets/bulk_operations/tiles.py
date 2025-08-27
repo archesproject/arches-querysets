@@ -556,7 +556,7 @@ class TileTreeOperation:
         aliases = []
 
         from arches_querysets.models import TileTree
-        
+
         if isinstance(self.entry, TileTree):
             nodes = self.entry.resourceinstance.graph.node_set.all()
         else:
