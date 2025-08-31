@@ -59,7 +59,7 @@ class DatatypeRepresentationTests(GraphTestCase):
                     value = getattr(resource_data, lookup)
                     self.assertEqual(value.get("display_value"), representation)
                     value = getattr(resource_data_none, lookup)
-                    self.assertEqual(value.get("display_value"), "(Empty)")
+                    self.assertEqual(value.get("display_value"), "")
 
     def test_as_representation_details(self):
         detail_values = {
