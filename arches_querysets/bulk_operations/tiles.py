@@ -4,7 +4,7 @@ from collections import defaultdict
 from operator import attrgetter
 
 from django.core.exceptions import ValidationError
-from django.db import ProgrammingError, transaction
+from django.db import IntegrityError, ProgrammingError, transaction
 from django.db.models import F, Q
 from django.utils.translation import get_language, gettext as _
 
@@ -328,6 +328,12 @@ class TileTreeOperation:
                     "node_value", value_to_validate
                 )
 
+            if isinstance(value_to_validate, list):  # file list datatype
+                value_to_validate = [
+                    item.get("node_value", item) if isinstance(item, dict) else item
+                    for item in value_to_validate
+                ]
+
             self._run_datatype_methods(tile, value_to_validate, node)
 
     def _run_datatype_methods(self, tile, value_to_validate, node):
@@ -351,7 +357,10 @@ class TileTreeOperation:
             return
         try:
             transformed = datatype_instance.transform_value_for_tile(
-                value_to_validate, languages=self.languages, **node.config
+                value_to_validate,
+                languages=self.languages,
+                mutating_tile=tile,
+                **node.config,
             )
         except ValueError:  # BooleanDataType raises.
             # validate() will handle.
@@ -379,6 +388,8 @@ class TileTreeOperation:
                     tile.data[node_id_str], None, None, None
                 )
             )
+        except IntegrityError:  # file type raises
+            pass
 
     def _save(self):
         # Instantiate proxy models for now, but TODO: expose this
