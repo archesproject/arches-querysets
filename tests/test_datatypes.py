@@ -1,4 +1,5 @@
 import json
+from unittest.mock import Mock
 
 from arches_querysets.models import ResourceTileTree
 from arches_querysets.utils.tests import GraphTestCase
@@ -329,8 +330,10 @@ class DatatypeMethodTests(GraphTestCase):
                     datatype_instance = self.datatype_factory.get_instance(
                         datatype=datatype
                     )
+                    fake_tile = Mock()
+                    fake_tile.pk = None
                     transformed_value = datatype_instance.transform_value_for_tile(
-                        value["input"]
+                        value["input"], mutating_tile=fake_tile
                     )
                     if equality_test := value.get("equality_test"):
                         self.assertTrue(
