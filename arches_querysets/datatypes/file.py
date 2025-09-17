@@ -35,9 +35,9 @@ class FileListDataType(datatypes.FileListDataType):
             for file in value:
                 matching_file_info = next(
                     (
-                        file_dict
-                        for file_dict in original_value
-                        if file_dict.get("name") == file.get("name")
+                        file_name
+                        for file_name in stringified_list
+                        if file_name == file.get("name")
                     ),
                     None,
                 )
