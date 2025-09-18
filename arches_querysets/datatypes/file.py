@@ -33,7 +33,7 @@ class FileListDataType(datatypes.FileListDataType):
             )
             new_value = []
             for file in value:
-                if not isinstance(value, str):
+                if not isinstance(original_value, str):
                     matching_file_info = next(
                         (
                             file_dict
