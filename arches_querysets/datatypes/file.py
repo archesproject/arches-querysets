@@ -33,16 +33,19 @@ class FileListDataType(datatypes.FileListDataType):
             )
             new_value = []
             for file in value:
-                matching_file_info = next(
-                    (
-                        file_name
-                        for file_name in stringified_list
-                        if file_name == file.get("name")
-                    ),
-                    None,
-                )
-                if matching_file_info:
-                    new_value.append({**matching_file_info, **file})
+                if not isinstance(value, str):
+                    matching_file_info = next(
+                        (
+                            file_dict
+                            for file_dict in original_value
+                            if file_dict.get("name") == file.get("name")
+                        ),
+                        None,
+                    )
+                    if matching_file_info:
+                        new_value.append({**matching_file_info, **file})
+                else:
+                    new_value.append(file)
         else:
             new_value = super().transform_value_for_tile(
                 value, languages=languages, **kwargs

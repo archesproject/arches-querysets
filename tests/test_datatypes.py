@@ -229,6 +229,10 @@ class DatatypeMethodTests(GraphTestCase):
                             "url": "/files/b503428b-1e04-4c79-8188-f70837461a07",
                             "accepted": True,
                             "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
+                            "altText": "",
+                            "attribution": "",
+                            "description": "",
+                            "title": "",
                         },
                         {
                             "status": "uploaded",
@@ -238,6 +242,10 @@ class DatatypeMethodTests(GraphTestCase):
                             "url": "/files/35a11db0-3796-4b25-becd-b369096a0942",
                             "accepted": True,
                             "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
+                            "altText": "",
+                            "attribution": "",
+                            "description": "",
+                            "title": "",
                         },
                     ],
                     "equality_test": lambda list1, list2: list1[0].keys()
