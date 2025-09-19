@@ -328,12 +328,6 @@ class TileTreeOperation:
                     "node_value", value_to_validate
                 )
 
-            if isinstance(value_to_validate, list):  # file list datatype
-                value_to_validate = [
-                    item.get("node_value", item) if isinstance(item, dict) else item
-                    for item in value_to_validate
-                ]
-
             self._run_datatype_methods(tile, value_to_validate, node)
 
     def _run_datatype_methods(self, tile, value_to_validate, node):
