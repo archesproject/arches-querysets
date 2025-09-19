@@ -215,9 +215,24 @@ class DatatypeMethodTests(GraphTestCase):
                                     "direction": "ltr",
                                 }
                             },
-                            "attribution": "",
-                            "description": "",
-                            "title": "",
+                            "attribution": {
+                                "en": {
+                                    "value": "",
+                                    "direction": "ltr",
+                                }
+                            },
+                            "description": {
+                                "en": {
+                                    "value": "",
+                                    "direction": "ltr",
+                                }
+                            },
+                            "title": {
+                                "en": {
+                                    "value": "",
+                                    "direction": "ltr",
+                                }
+                            },
                         },
                         {
                             "status": "uploaded",
@@ -233,9 +248,24 @@ class DatatypeMethodTests(GraphTestCase):
                                     "direction": "ltr",
                                 }
                             },
-                            "attribution": "",
-                            "description": "",
-                            "title": "",
+                            "attribution": {
+                                "en": {
+                                    "value": "",
+                                    "direction": "ltr",
+                                }
+                            },
+                            "description": {
+                                "en": {
+                                    "value": "",
+                                    "direction": "ltr",
+                                }
+                            },
+                            "title": {
+                                "en": {
+                                    "value": "",
+                                    "direction": "ltr",
+                                }
+                            },
                         },
                     ],
                     "output": [
@@ -253,9 +283,24 @@ class DatatypeMethodTests(GraphTestCase):
                                     "direction": "ltr",
                                 }
                             },
-                            "attribution": "",
-                            "description": "",
-                            "title": "",
+                            "attribution": {
+                                "en": {
+                                    "value": "",
+                                    "direction": "ltr",
+                                }
+                            },
+                            "description": {
+                                "en": {
+                                    "value": "",
+                                    "direction": "ltr",
+                                }
+                            },
+                            "title": {
+                                "en": {
+                                    "value": "",
+                                    "direction": "ltr",
+                                }
+                            },
                         },
                         {
                             "status": "uploaded",
@@ -271,9 +316,24 @@ class DatatypeMethodTests(GraphTestCase):
                                     "direction": "ltr",
                                 }
                             },
-                            "attribution": "",
-                            "description": "",
-                            "title": "",
+                            "attribution": {
+                                "en": {
+                                    "value": "",
+                                    "direction": "ltr",
+                                }
+                            },
+                            "description": {
+                                "en": {
+                                    "value": "",
+                                    "direction": "ltr",
+                                }
+                            },
+                            "title": {
+                                "en": {
+                                    "value": "",
+                                    "direction": "ltr",
+                                }
+                            },
                         },
                     ],
                     "equality_test": lambda list1, list2: list1[0].keys()
