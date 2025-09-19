@@ -9,6 +9,17 @@ from arches.app.models.models import File
 class FileListDataType(datatypes.FileListDataType):
     localized_metadata_keys = {"altText", "attribution", "description", "title"}
 
+    def get_display_value(self, tile, node, **kwargs):
+        data = self.get_tile_data(tile)
+        files = data[str(node.nodeid)]
+        file_urls = ""
+        if files is not None:
+            file_urls = " | ".join(
+                [file["url"] or "" for file in files if "url" in file]
+            )
+
+        return file_urls
+
     def transform_value_for_tile(self, value, *, languages=None, **kwargs):
         if not value:
             return value
@@ -55,7 +66,7 @@ class FileListDataType(datatypes.FileListDataType):
         # after discussion with chiatt, this behavior is only really needed
         # for the bulk loader (and causes integrity problems/duplicity) -
         # file will be recreated later in post_tile_save
-        if not kwargs["mutating_tile"].pk:
+        if not kwargs["is_existing_tile"]:
             File.objects.filter(
                 fileid__in=[file["file_id"] for file in new_value]
             ).delete()

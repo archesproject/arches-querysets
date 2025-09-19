@@ -4,7 +4,7 @@ from collections import defaultdict
 from operator import attrgetter
 
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, ProgrammingError, transaction
+from django.db import ProgrammingError, transaction
 from django.db.models import F, Q
 from django.utils.translation import get_language, gettext as _
 
@@ -359,7 +359,7 @@ class TileTreeOperation:
             transformed = datatype_instance.transform_value_for_tile(
                 value_to_validate,
                 languages=self.languages,
-                mutating_tile=tile,
+                is_existing_tile=bool(tile._state.db),
                 **node.config,
             )
         except ValueError:  # BooleanDataType raises.
@@ -388,8 +388,6 @@ class TileTreeOperation:
                     tile.data[node_id_str], None, None, None
                 )
             )
-        except IntegrityError:  # file type raises
-            pass
 
     def _save(self):
         # Instantiate proxy models for now, but TODO: expose this

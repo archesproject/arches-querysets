@@ -209,7 +209,12 @@ class DatatypeMethodTests(GraphTestCase):
                             "url": "/files/b503428b-1e04-4c79-8188-f70837461a07",
                             "accepted": True,
                             "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
-                            "altText": "",
+                            "altText": {
+                                "en": {
+                                    "value": "Replaceable alt text",
+                                    "direction": "ltr",
+                                }
+                            },
                             "attribution": "",
                             "description": "",
                             "title": "",
@@ -222,7 +227,12 @@ class DatatypeMethodTests(GraphTestCase):
                             "url": "/files/35a11db0-3796-4b25-becd-b369096a0942",
                             "accepted": True,
                             "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
-                            "altText": "",
+                            "altText": {
+                                "en": {
+                                    "value": "Replaceable alt text",
+                                    "direction": "ltr",
+                                }
+                            },
                             "attribution": "",
                             "description": "",
                             "title": "",
@@ -237,7 +247,12 @@ class DatatypeMethodTests(GraphTestCase):
                             "url": "/files/b503428b-1e04-4c79-8188-f70837461a07",
                             "accepted": True,
                             "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
-                            "altText": "",
+                            "altText": {
+                                "en": {
+                                    "value": "Replaceable alt text",
+                                    "direction": "ltr",
+                                }
+                            },
                             "attribution": "",
                             "description": "",
                             "title": "",
@@ -250,7 +265,12 @@ class DatatypeMethodTests(GraphTestCase):
                             "url": "/files/35a11db0-3796-4b25-becd-b369096a0942",
                             "accepted": True,
                             "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
-                            "altText": "",
+                            "altText": {
+                                "en": {
+                                    "value": "Replaceable alt text",
+                                    "direction": "ltr",
+                                }
+                            },
                             "attribution": "",
                             "description": "",
                             "title": "",
@@ -346,10 +366,8 @@ class DatatypeMethodTests(GraphTestCase):
                     datatype_instance = self.datatype_factory.get_instance(
                         datatype=datatype
                     )
-                    fake_tile = Mock()
-                    fake_tile.pk = None
                     transformed_value = datatype_instance.transform_value_for_tile(
-                        value["input"], mutating_tile=fake_tile
+                        value["input"], is_existing_tile=False
                     )
                     if equality_test := value.get("equality_test"):
                         self.assertTrue(
