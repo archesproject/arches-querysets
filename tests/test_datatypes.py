@@ -1,4 +1,5 @@
 import json
+from unittest.mock import Mock
 
 from arches_querysets.models import ResourceTileTree
 from arches_querysets.utils.tests import GraphTestCase
@@ -208,6 +209,30 @@ class DatatypeMethodTests(GraphTestCase):
                             "url": "/files/b503428b-1e04-4c79-8188-f70837461a07",
                             "accepted": True,
                             "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
+                            "altText": {
+                                "en": {
+                                    "value": "Replaceable alt text",
+                                    "direction": "ltr",
+                                }
+                            },
+                            "attribution": {
+                                "en": {
+                                    "value": "",
+                                    "direction": "ltr",
+                                }
+                            },
+                            "description": {
+                                "en": {
+                                    "value": "",
+                                    "direction": "ltr",
+                                }
+                            },
+                            "title": {
+                                "en": {
+                                    "value": "",
+                                    "direction": "ltr",
+                                }
+                            },
                         },
                         {
                             "status": "uploaded",
@@ -217,6 +242,30 @@ class DatatypeMethodTests(GraphTestCase):
                             "url": "/files/35a11db0-3796-4b25-becd-b369096a0942",
                             "accepted": True,
                             "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
+                            "altText": {
+                                "en": {
+                                    "value": "Replaceable alt text",
+                                    "direction": "ltr",
+                                }
+                            },
+                            "attribution": {
+                                "en": {
+                                    "value": "",
+                                    "direction": "ltr",
+                                }
+                            },
+                            "description": {
+                                "en": {
+                                    "value": "",
+                                    "direction": "ltr",
+                                }
+                            },
+                            "title": {
+                                "en": {
+                                    "value": "",
+                                    "direction": "ltr",
+                                }
+                            },
                         },
                     ],
                     "output": [
@@ -228,6 +277,30 @@ class DatatypeMethodTests(GraphTestCase):
                             "url": "/files/b503428b-1e04-4c79-8188-f70837461a07",
                             "accepted": True,
                             "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
+                            "altText": {
+                                "en": {
+                                    "value": "Replaceable alt text",
+                                    "direction": "ltr",
+                                }
+                            },
+                            "attribution": {
+                                "en": {
+                                    "value": "",
+                                    "direction": "ltr",
+                                }
+                            },
+                            "description": {
+                                "en": {
+                                    "value": "",
+                                    "direction": "ltr",
+                                }
+                            },
+                            "title": {
+                                "en": {
+                                    "value": "",
+                                    "direction": "ltr",
+                                }
+                            },
                         },
                         {
                             "status": "uploaded",
@@ -237,6 +310,30 @@ class DatatypeMethodTests(GraphTestCase):
                             "url": "/files/35a11db0-3796-4b25-becd-b369096a0942",
                             "accepted": True,
                             "renderer": "5e05aa2e-5db0-4922-8938-b4d2b7919733",
+                            "altText": {
+                                "en": {
+                                    "value": "Replaceable alt text",
+                                    "direction": "ltr",
+                                }
+                            },
+                            "attribution": {
+                                "en": {
+                                    "value": "",
+                                    "direction": "ltr",
+                                }
+                            },
+                            "description": {
+                                "en": {
+                                    "value": "",
+                                    "direction": "ltr",
+                                }
+                            },
+                            "title": {
+                                "en": {
+                                    "value": "",
+                                    "direction": "ltr",
+                                }
+                            },
                         },
                     ],
                     "equality_test": lambda list1, list2: list1[0].keys()
@@ -330,7 +427,7 @@ class DatatypeMethodTests(GraphTestCase):
                         datatype=datatype
                     )
                     transformed_value = datatype_instance.transform_value_for_tile(
-                        value["input"]
+                        value["input"], is_existing_tile=False
                     )
                     if equality_test := value.get("equality_test"):
                         self.assertTrue(
