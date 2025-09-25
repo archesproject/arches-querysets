@@ -1,6 +1,7 @@
 import uuid
 
 from arches_querysets.models import ResourceTileTree, TileTree
+from arches_querysets.query_expressions import AllStrings
 from arches_querysets.utils.tests import GraphTestCase
 
 
@@ -153,6 +154,14 @@ class LocalizedStringLookupTests(LookupTestCase):
         ]:
             with self.subTest(lookup=lookup, value=value):
                 self.assertFalse(self.resources.filter(**{lookup: value}))
+
+    def test_all_string_values(self):
+        self.assertSequenceEqual(
+            self.resources.exclude(string_alias=None)
+            .values(all=AllStrings("string_alias"))
+            .values_list("all", flat=True),
+            [["forty-two"]],
+        )
 
 
 class ResourceInstanceLookupTests(LookupTestCase):
