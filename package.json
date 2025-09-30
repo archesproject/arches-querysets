@@ -18,10 +18,10 @@
         "vitest": "vitest --run --coverage"
     },
     "dependencies": {
-        "arches": "archesproject/arches#stable/8.0.1"
+        "arches": "archesproject/arches#stable/8.0.4"
     },
     "devDependencies": {
-        "arches-dev-dependencies": "archesproject/arches-dev-dependencies#stable/8.0.1"
+        "arches-dev-dependencies": "archesproject/arches-dev-dependencies#stable/8.0.4"
     },
     "nodeModulesPaths": {
     },
