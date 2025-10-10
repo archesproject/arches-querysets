@@ -544,8 +544,6 @@ class ArchesTileSerializer(serializers.ModelSerializer, NodeFetcherMixin):
         self._graph_slug = kwargs.pop(
             "graph_slug", context.get("graph_slug", None) if context else None
         )
-        print(f"Graph SLUG: {self._graph_slug}")
-        print(f"Graph SLUG2: {self.graph_slug}")
         self._graph_nodes = kwargs.pop(
             "graph_nodes", context.get("graph_nodes", None) if context else None
         )
@@ -604,7 +602,6 @@ class ArchesTileSerializer(serializers.ModelSerializer, NodeFetcherMixin):
             )
             .get()
         )
-        print(f"Got graph: {graph}")
         resource, resource_created = self.create_resource_if_missing(
             validated_data, graph
         )
