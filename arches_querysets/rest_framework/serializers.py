@@ -544,6 +544,8 @@ class ArchesTileSerializer(serializers.ModelSerializer, NodeFetcherMixin):
         self._graph_slug = kwargs.pop(
             "graph_slug", context.get("graph_slug", None) if context else None
         )
+        print(f"Graph SLUG: {self._graph_slug}")
+        print(f"Graph SLUG2: {self.graph_slug}")
         self._graph_nodes = kwargs.pop(
             "graph_nodes", context.get("graph_nodes", None) if context else None
         )
@@ -602,6 +604,7 @@ class ArchesTileSerializer(serializers.ModelSerializer, NodeFetcherMixin):
             )
             .get()
         )
+        print(f"Got graph: {graph}")
         resource, resource_created = self.create_resource_if_missing(
             validated_data, graph
         )
@@ -691,10 +694,13 @@ class ArchesResourceSerializer(serializers.ModelSerializer, NodeFetcherMixin):
     def build_relational_field(self, field_name, relation_info):
         ret = super().build_relational_field(field_name, relation_info)
         # arches_version==9.0.0
-        if arches_version >= (8, 0) and field_name == "graph":
-            ret[1]["queryset"] = ret[1]["queryset"].filter(
-                slug=self.graph_slug, source_identifier=None
-            )
+        if field_name == "graph":
+            if arches_version >= (8, 0):
+                ret[1]["queryset"] = ret[1]["queryset"].filter(
+                    slug=self.graph_slug, source_identifier=None
+                )
+            else:
+                ret[1]["queryset"] = ret[1]["queryset"].filter(slug=self.graph_slug)
         return ret
 
     def validate(self, attrs):
