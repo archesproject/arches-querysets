@@ -281,6 +281,19 @@ class RestFrameworkTests(GraphTestCase):
             str(self.resource_none.pk),
         )
 
+    def test_filter_kwargs_disallows_joins(self):
+        self.assertContains(
+            self.client.get(
+                reverse(
+                    "arches_querysets:api-resources",
+                    kwargs={"graph": "datatype_lookups"},
+                ),
+                QUERY_STRING=f"aliased_data__principaluser__username=dev",
+            ),
+            "Invalid filter param: principaluser",
+            status_code=HTTPStatus.BAD_REQUEST,
+        )
+
     def test_bogus_graph_slug(self):
         response = self.client.get(
             reverse("arches_querysets:api-resources", kwargs={"graph": "bogus"})
