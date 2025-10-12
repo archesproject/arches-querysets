@@ -13,8 +13,7 @@ from rest_framework.fields import empty
 
 from arches import VERSION as arches_version
 from arches.app.models.fields.i18n import I18n_JSON, I18n_String
-from arches.app.models.models import EditLog, GraphModel, Node, NodeGroup
-from arches.app.models.resource import Resource
+from arches.app.models.models import GraphModel, Node, NodeGroup
 from arches.app.utils.betterJSONSerializer import JSONSerializer
 
 from arches_querysets.datatypes.datatypes import DataTypeFactory
@@ -652,7 +651,10 @@ class ArchesResourceSerializer(serializers.ModelSerializer, NodeFetcherMixin):
                 "default": None,
                 "allow_null": True,
             },
-            "graph": {"allow_null": True},
+            # TODO (arches_version): when Arches 8.0 is the lowest supported
+            # version, "required": False can be removed, by relying on the
+            # underlying blank=True on model.
+            "graph": {"allow_null": True, "required": False},
         }
 
     def __init__(

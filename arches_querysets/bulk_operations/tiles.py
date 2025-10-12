@@ -200,6 +200,13 @@ class TileTreeOperation:
         else:
             next_sort_order = max(t.sortorder or 0 for t in existing_tiles) + 1
 
+        if self.for_new_resource or (
+            isinstance(self.entry, ResourceInstance) and self.entry._state.adding
+        ):
+            exclude = ["resourceinstance"]
+        else:
+            exclude = []
+
         to_insert = set()
         to_update = set()
         to_delete = set()
@@ -222,7 +229,6 @@ class TileTreeOperation:
                 new_tile._incoming_tile = new_tile
                 if isinstance(container, TileModel):
                     new_tile.parenttile = container
-                exclude = ["resourceinstance"] if self.for_new_resource else []
                 new_tile.full_clean(exclude=exclude)
                 if new_tile.pk is None:
                     new_tile.pk = uuid.uuid4()

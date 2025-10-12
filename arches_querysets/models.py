@@ -195,11 +195,11 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
         """Initialize a blank tile with empty values for each nodegroup lacking a tile."""
         append_tiles_recursively(self)
 
-    def save_edit(self, user=None, transaction_id=None):
+    def save_edit(self, user=None, transaction_id=None, *, edit_type=None):
         """Intended to replace proxy model method eventually."""
         if self._state.adding:
             edit_type = "create"
-        else:
+        if not edit_type:
             return
 
         # Until save_edit() is a static method, work around it.
@@ -227,11 +227,11 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
         operation = TileTreeOperation(
             entry=self, request=request, partial=partial, save_kwargs=kwargs
         )
-        for_resource_create = not self.pk
+        for_new_resource = self._state.adding
 
         # This will also call ResourceInstance.save()
         operation.validate_and_save_tiles()
-        if for_resource_create:
+        if not self.pk:
             self.pk = operation.resourceid
 
         # Run side effects trapped on Resource.save()
@@ -244,8 +244,13 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
         if index:
             proxy_resource.index()
 
-        if request and not for_resource_create:
-            self.save_edit(user=request.user, transaction_id=operation.transaction_id)
+        # arches_version==9.0.0
+        if arches_version < (8, 0) and request and for_new_resource:
+            self.save_edit(
+                user=request.user,
+                transaction_id=operation.transaction_id,
+                edit_type="create",
+            )
 
         self.refresh_from_db(
             using=kwargs.get("using"), fields=kwargs.get("update_fields")

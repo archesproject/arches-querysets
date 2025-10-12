@@ -187,13 +187,16 @@ class RestFrameworkTests(GraphTestCase):
         )
         self.assertEqual(response.status_code, HTTPStatus.CREATED, response.content)
 
+        edits = EditLog.objects.filter(
+            resourceinstanceid=response.json()["resourceinstanceid"],
+        )
         self.assertSequenceEqual(
-            EditLog.objects.filter(
-                resourceinstanceid=response.json()["resourceinstanceid"],
-            )
-            .values_list("edittype", flat=True)
-            .order_by("edittype"),
+            edits.values_list("edittype", flat=True).order_by("edittype"),
             ["create", "tile create", "tile create"],
+        )
+        self.assertEqual(
+            len(set(edits.values_list("transactionid", flat=True))),
+            1,
         )
 
     def test_update_tile(self):
