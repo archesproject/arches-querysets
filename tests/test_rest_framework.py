@@ -52,7 +52,7 @@ class RestFrameworkTests(GraphTestCase):
         )
 
         # The response includes the context.
-        self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        self.assertEqual(response.status_code, HTTPStatus.CREATED, response.content)
         self.assertIn("aliased_data", response.json())
         self.assertEqual(
             response.json()["aliased_data"]["string_alias_n"],
@@ -64,8 +64,6 @@ class RestFrameworkTests(GraphTestCase):
                 "details": [],
             },
         )
-        self.assertEqual(response.status_code, HTTPStatus.CREATED, response.content)
-
         self.assertSequenceEqual(
             EditLog.objects.filter(
                 resourceinstanceid=response.json()["resourceinstance"],
