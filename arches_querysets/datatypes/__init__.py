@@ -9,5 +9,6 @@ from .resource_types import *
 from .node_value import *
 from .string import *
 from .url import *
+from .boolean import *
 
 from .datatypes import *
