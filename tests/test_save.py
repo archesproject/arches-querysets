@@ -44,7 +44,7 @@ class SaveTileTests(GraphTestCase):
         self.resource_42.refresh_from_db()
         self.resource_42.fill_blanks()
         # Saving a blank tile should populate default values if defaults are defined.
-        self.resource_42.save()
+        self.resource_42.save(force_admin=True)
         self.assert_default_values_present(self.resource_42)
 
         # fill_blanks gives an unsaved empty tile, but we also need to test that inserting
@@ -57,7 +57,7 @@ class SaveTileTests(GraphTestCase):
         for node in self.resource_42.aliased_data.datatypes_1.data:
             self.resource_42.aliased_data.datatypes_1.data[node] = None
         # Save should stock defaults
-        self.resource_42.aliased_data.datatypes_1.save()
+        self.resource_42.aliased_data.datatypes_1.save(force_admin=True)
         self.assert_default_values_present(self.resource_42)
 
     def test_fill_blanks(self):
@@ -93,7 +93,7 @@ class SaveTileTests(GraphTestCase):
             # TODO(arches_version==9.0.0): in Arches 8+, data={} can be removed.
             data={},
         )
-        new_child_tile.save()
+        new_child_tile.save(force_admin=True)
         # The parent property holds the richer TileTree
         self.assertIsInstance(new_child_tile.parent, TileTree)
         # The regular Django field is untouched (still a vanilla TileModel)
@@ -101,10 +101,11 @@ class SaveTileTests(GraphTestCase):
         self.assertIsInstance(new_child_tile.parenttile, TileModel)
 
     def test_cardinality_error(self):
+        tt = TileTree(
+            nodegroup=self.nodegroup_1, resourceinstance=self.resource_42, data={}
+        )
         with self.assertRaises(ValidationError) as ctx:
-            TileTree.objects.create(
-                nodegroup=self.nodegroup_1, resourceinstance=self.resource_42, data={}
-            )
+            tt.save(force_admin=True)
         self.assertEqual(
             ctx.exception.message_dict, {"datatypes_1": ["Tile Cardinality Error"]}
         )
