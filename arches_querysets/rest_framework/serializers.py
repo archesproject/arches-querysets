@@ -123,26 +123,26 @@ def _fill_blank_cardinality_n_lists(serializer, initial_or_repr):
 
 def _handle_nested_aliased_data(data, *, fields_map) -> AliasedData:
     all_data = AliasedData(**data)
-    for field_name, field in fields_map.items():
+    for field_name, serializer in fields_map.items():
         field_data = getattr(all_data, field_name, None)
-        if isinstance(field, ArchesTileSerializer) or (
-            isinstance(field, serializers.ListSerializer)
-            and isinstance(field.child, ArchesTileSerializer)
+        if isinstance(serializer, ArchesTileSerializer) or (
+            isinstance(serializer, serializers.ListSerializer)
+            and isinstance(serializer.child, ArchesTileSerializer)
         ):
-            field.initial_data = field_data
+            serializer.initial_data = field_data
             # Later: could look into batching these exceptions up.
-            field.is_valid(raise_exception=True)
-            if field.validated_data:
-                if getattr(field, "many", False):
+            serializer.is_valid(raise_exception=True)
+            if serializer.validated_data:
+                if getattr(serializer, "many", False):
                     tile_or_tiles = [
                         TileTree(**validated_tile_data)
-                        for validated_tile_data in field.validated_data
+                        for validated_tile_data in serializer.validated_data
                     ]
                 else:
-                    tile_or_tiles = TileTree(**field.validated_data)
+                    tile_or_tiles = TileTree(**serializer.validated_data)
                 setattr(all_data, field_name, tile_or_tiles)
         else:
-            setattr(all_data, field_name, field.to_internal_value(field_data))
+            setattr(all_data, field_name, serializer.to_internal_value(field_data))
     return all_data
 
 
