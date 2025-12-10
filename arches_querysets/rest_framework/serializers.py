@@ -89,7 +89,7 @@ def _wrap_serializer_field(serializer_field_class) -> type:
     )
 
 
-def _fill_blank_cardinality_n_lists(serializer, initial_or_repr):
+def _fill_blank_cardinality_n_lists(serializer, data):
     """
     When fill_blanks is True, ensure that any ListSerializer field that
     is currently [] or None gets a single blank element.
@@ -97,28 +97,17 @@ def _fill_blank_cardinality_n_lists(serializer, initial_or_repr):
     This is meant to be called from get_initial() (for /blank routes),
     but it also works for a representation dict.
     """
-    if not serializer.context.get("fill_blanks"):
-        return initial_or_repr
-
-    if not isinstance(initial_or_repr, dict):
-        return initial_or_repr
+    if not serializer.context.get("fill_blanks") or not isinstance(data, dict):
+        return data
 
     for field_name, field in serializer.fields.items():
-        if not isinstance(field, serializers.ListSerializer):
-            continue
+        if isinstance(field, serializers.ListSerializer) and data.get(field_name) in (
+            None,
+            [],
+        ):
+            data[field_name] = [field.child.get_initial()]
 
-        current_value = initial_or_repr.get(field_name)
-
-        # Only touch truly empty lists / None – leave any existing items alone.
-        if current_value not in (None, []):
-            continue
-
-        child = field.child
-        # Ask the child for its "blank" initial representation.
-        blank_element = child.get_initial()
-        initial_or_repr[field_name] = [blank_element]
-
-    return initial_or_repr
+    return data
 
 
 def _handle_nested_aliased_data(data, *, fields_map) -> AliasedData:
