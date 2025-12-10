@@ -218,21 +218,15 @@ class NodeFetcherMixin:
         """The view provides a context, so this is mainly here for script usage."""
         ensured_request = ensure_request(request)
 
-        # Derive fill_blanks from the query string if possible.
-        fill_blanks_raw = ""
-        try:
-            fill_blanks_raw = ensured_request.GET.get("fill_blanks", "")
-        except Exception:
-            fill_blanks_raw = ""
-
-        fill_blanks = str(fill_blanks_raw).lower() == "true"
+        fill_blanks = ensured_request.GET.get("fill_blanks", "").lower() == "true"
 
         return {
             "graph_slug": graph_slug,
             "graph_nodes": graph_nodes,
             "nodegroup_alias": nodegroup_alias,
-            "nodegroup_alias_lookup": nodegroup_alias_lookup
-            or get_nodegroup_alias_lookup(graph_slug),
+            "nodegroup_alias_lookup": (
+                nodegroup_alias_lookup or get_nodegroup_alias_lookup(graph_slug)
+            ),
             "request": ensured_request,
             "fill_blanks": fill_blanks,
         }
@@ -448,8 +442,8 @@ class TileAliasedDataSerializer(serializers.ModelSerializer, NodeFetcherMixin):
 
     def get_initial(self):
         """
-        Used for /blank routes: ensure cardinality-n lists inside aliased_data
-        get one blank element when fill_blanks is True.
+        Used for /blank routes: build initial data and, if fill_blanks is True,
+        ensure cardinality-n lists get one blank element.
         """
         initial = super().get_initial()
         return _fill_blank_cardinality_n_lists(self, initial)
