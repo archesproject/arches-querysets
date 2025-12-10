@@ -206,7 +206,6 @@ class NodeFetcherMixin:
     ):
         """The view provides a context, so this is mainly here for script usage."""
         ensured_request = ensure_request(request)
-
         fill_blanks = ensured_request.GET.get("fill_blanks", "").lower() == "true"
 
         return {
