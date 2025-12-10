@@ -97,16 +97,16 @@ def _handle_nested_aliased_data(data, *, fields_map) -> AliasedData:
             isinstance(serializer, serializers.ListSerializer)
             and isinstance(serializer.child, ArchesTileSerializer)
         ):
-            serializer.initial_data = field_data
-            # Later: could look into batching these exceptions up.
-            serializer.is_valid(raise_exception=True)
-            if serializer.validated_data:
+            validated_data = serializer.run_validation(field_data)
+
+            if validated_data:
                 if getattr(serializer, "many", False):
                     tile_or_tiles = [
-                        TileTree(**data) for data in serializer.validated_data
+                        TileTree(**validated_tile_data)
+                        for validated_tile_data in validated_data
                     ]
                 else:
-                    tile_or_tiles = TileTree(**serializer.validated_data)
+                    tile_or_tiles = TileTree(**validated_data)
                 setattr(all_data, field_name, tile_or_tiles)
         else:
             setattr(all_data, field_name, serializer.to_internal_value(field_data))
