@@ -89,6 +89,27 @@ def _wrap_serializer_field(serializer_field_class) -> type:
     )
 
 
+def _fill_blank_cardinality_n_lists(serializer, data):
+    """
+    When fill_blanks is True, ensure that any ListSerializer field that
+    is currently [] or None gets a single blank element.
+
+    This is meant to be called from get_initial() (for /blank routes),
+    but it also works for a representation dict.
+    """
+    if not serializer.context.get("fill_blanks") or not isinstance(data, dict):
+        return data
+
+    for field_name, field in serializer.fields.items():
+        if isinstance(field, serializers.ListSerializer) and data.get(field_name) in (
+            None,
+            [],
+        ):
+            data[field_name] = [field.child.get_initial()]
+
+    return data
+
+
 def _handle_nested_aliased_data(data, *, fields_map) -> AliasedData:
     all_data = AliasedData(**data)
     for field_name, serializer in fields_map.items():
@@ -183,14 +204,18 @@ class NodeFetcherMixin:
         request=None,
     ):
         """The view provides a context, so this is mainly here for script usage."""
+        ensured_request = ensure_request(request)
+        fill_blanks = ensured_request.GET.get("fill_blanks", "").lower() == "true"
+
         return {
             "graph_slug": graph_slug,
             "graph_nodes": graph_nodes,
             "nodegroup_alias": nodegroup_alias,
-            "nodegroup_alias_lookup": nodegroup_alias_lookup
-            or get_nodegroup_alias_lookup(graph_slug),
-            "request": ensure_request(request),
-            "fill_blanks": False,
+            "nodegroup_alias_lookup": (
+                nodegroup_alias_lookup or get_nodegroup_alias_lookup(graph_slug)
+            ),
+            "request": ensured_request,
+            "fill_blanks": fill_blanks,
         }
 
 
@@ -261,6 +286,14 @@ class ResourceAliasedDataSerializer(serializers.Serializer, NodeFetcherMixin):
         else:
             field_names.extend(self.Meta.nodegroups)
         return field_names
+
+    def get_initial(self):
+        """
+        Used for /blank routes: build initial data and, if fill_blanks is True,
+        ensure cardinality-n lists get one blank element.
+        """
+        initial = super().get_initial()
+        return _fill_blank_cardinality_n_lists(self, initial)
 
     def to_internal_value(self, data):
         """Make nested aliased data writable."""
@@ -393,6 +426,14 @@ class TileAliasedDataSerializer(serializers.ModelSerializer, NodeFetcherMixin):
 
         field_names.extend(self._child_nodegroup_aliases)
         return field_names
+
+    def get_initial(self):
+        """
+        Used for /blank routes: build initial data and, if fill_blanks is True,
+        ensure cardinality-n lists get one blank element.
+        """
+        initial = super().get_initial()
+        return _fill_blank_cardinality_n_lists(self, initial)
 
     def build_unknown_field(self, field_name, model_class):
         for node in self.graph_nodes:
