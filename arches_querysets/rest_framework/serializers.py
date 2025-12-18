@@ -9,7 +9,10 @@ from django.utils.translation import gettext as _
 from rest_framework.exceptions import ValidationError
 from rest_framework import renderers
 from rest_framework import serializers
+from rest_framework.utils import model_meta
 from rest_framework.fields import empty
+from rest_framework.serializers import raise_errors_on_nested_writes
+import time
 
 from arches import VERSION as arches_version
 from arches.app.models.fields.i18n import I18n_JSON, I18n_String
@@ -325,6 +328,7 @@ class TileAliasedDataSerializer(serializers.ModelSerializer, NodeFetcherMixin):
         return dictionary.get(self.field_name, empty)
 
     def get_fields(self):
+        start_time = time.perf_counter()
         nodegroup_alias = (
             # 1. From __init__()
             getattr(self, "_root_node", None)
@@ -344,7 +348,9 @@ class TileAliasedDataSerializer(serializers.ModelSerializer, NodeFetcherMixin):
             raise PermissionError
 
         field_map = super().get_fields()
+        finalize_start_time = time.perf_counter()
         self.finalize_initial_values(field_map)
+        finalize_end_time = time.perf_counter()
 
         # __all__ includes children as well.
         if self.Meta.fields == "__all__" and not self.Meta.exclude_children:
@@ -381,7 +387,13 @@ class TileAliasedDataSerializer(serializers.ModelSerializer, NodeFetcherMixin):
                         sortorder=sortorder,
                         request=self.context["request"],
                     )
-
+        end_time = time.perf_counter()
+        TileAliasedDataSerializer.cumulative_get_fields_time += (
+            end_time - (finalize_end_time - finalize_start_time) - start_time
+        )
+        print(
+            f"Cumulative get_fields time: {TileAliasedDataSerializer.cumulative_get_fields_time:.6f} seconds"
+        )
         return field_map
 
     def get_default_field_names(self, declared_fields, model_info):
@@ -456,6 +468,9 @@ class TileAliasedDataSerializer(serializers.ModelSerializer, NodeFetcherMixin):
 
     def finalize_initial_values(self, field_map):
         """Get display values for initial values in bulk if possible."""
+
+        start_timer = time.perf_counter()
+
         nodes_by_alias = {node.alias: node for node in self.graph_nodes}
 
         values_by_datatype = defaultdict(list)
@@ -483,6 +498,14 @@ class TileAliasedDataSerializer(serializers.ModelSerializer, NodeFetcherMixin):
             )
             field.initial = pair
 
+        elapsed = time.perf_counter() - start_timer
+        TileAliasedDataSerializer.cumulative_finalize_initial_value_time += elapsed
+        print(elapsed, "seconds to finalize initial values")
+        print(
+            TileAliasedDataSerializer.cumulative_finalize_initial_value_time,
+            "cumulative seconds to finalize initial values",
+        )
+
     def to_internal_value(self, data):
         """Make nested aliased data writable."""
         self.initial_data = data
@@ -499,6 +522,10 @@ class TileAliasedDataSerializer(serializers.ModelSerializer, NodeFetcherMixin):
             attrs = validate_method(attrs, initial_tile_data=self.parent.initial_data)
 
         return attrs
+
+
+TileAliasedDataSerializer.cumulative_finalize_initial_value_time = 0
+TileAliasedDataSerializer.cumulative_get_fields_time = 0
 
 
 class SingleNodegroupAliasedDataSerializer(TileAliasedDataSerializer):

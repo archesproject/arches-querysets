@@ -153,6 +153,9 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
         ):
             raise ValidationError(_("Graph Has Different Publication"))
 
+        import time
+
+        start_time = time.perf_counter()
         request = request or self._request
         self._save_aliased_data(
             request=request,
@@ -160,6 +163,9 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
             partial=partial,
             force_admin=force_admin,
             **kwargs,
+        )
+        print(
+            f"ResourceTileTree.save aliased data took {time.perf_counter() - start_time} seconds"
         )
 
     @classmethod
@@ -218,26 +224,43 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
         )
 
     def refresh_from_db(self, using=None, fields=None, from_queryset=None):
+        import time
+
+        start_time = time.perf_counter()
         if from_queryset is None:
             # TODO: symptom that we need a backreference to the queryset args.
             from_queryset = self.__class__.get_tiles(
                 self.graph.slug,
                 as_representation=getattr(self, "_as_representation", False),
             )
+        print(
+            f"ResourceTileTree.refresh_from_db preparing from_queryset took {time.perf_counter() - start_time} seconds"
+        )
+        start_time = time.perf_counter()
         self._refresh_aliased_data(using, fields, from_queryset)
+        print(
+            f"ResourceTileTree.refresh_from_db _refresh_aliased_data took {time.perf_counter() - start_time} seconds"
+        )
 
     def _save_aliased_data(
         self, *, request=None, index=True, partial=True, force_admin=False, **kwargs
     ):
+        import time
+
         """Raises a compound ValidationError with any failing tile values."""
         request = ensure_request(request, force_admin)
         operation = TileTreeOperation(
             entry=self, request=request, partial=partial, save_kwargs=kwargs
         )
+
+        start_time = time.perf_counter()
         for_new_resource = self._state.adding
 
         # This will also call ResourceInstance.save()
         operation.validate_and_save_tiles()
+        print(
+            f"ResourceTileTree._save_aliased_data validate_and_save_tiles took {time.perf_counter() - start_time} seconds"
+        )
         if not self.pk:
             self.pk = operation.resourceid
 
@@ -247,10 +270,20 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
             .select_related("graph__publication")
             .get()
         )
+        start_time = time.perf_counter()
         proxy_resource.save_descriptors()
+        print(
+            f"ResourceTileTree._save_aliased_data save_descriptors took {time.perf_counter() - start_time} seconds"
+        )
+
+        start_time = time.perf_counter()
         if index:
             proxy_resource.index()
+        print(
+            f"ResourceTileTree._save_aliased_data index took {time.perf_counter() - start_time} seconds"
+        )
 
+        start_time = time.perf_counter()
         # arches_version==9.0.0
         if arches_version < (8, 0) and request and for_new_resource:
             self.save_edit(
@@ -258,9 +291,16 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
                 transaction_id=operation.transaction_id,
                 edit_type="create",
             )
+        print(
+            f"ResourceTileTree._save_aliased_data save_edit took {time.perf_counter() - start_time} seconds"
+        )
 
+        start_time = time.perf_counter()
         self.refresh_from_db(
             using=kwargs.get("using"), fields=kwargs.get("update_fields")
+        )
+        print(
+            f"ResourceTileTree._save_aliased_data refresh_from_db took {time.perf_counter() - start_time} seconds"
         )
 
 
@@ -686,6 +726,9 @@ class TileTree(TileModel, AliasedDataMixin):
         )
 
     def refresh_from_db(self, using=None, fields=None, from_queryset=None):
+        import time
+
+        start_time = time.perf_counter()
         if from_queryset is None:
             # TODO: symptom that we need a backreference to the queryset args.
             from_queryset = self.__class__.get_tiles(
@@ -693,7 +736,15 @@ class TileTree(TileModel, AliasedDataMixin):
                 nodegroup_alias=self.find_nodegroup_alias(),
                 as_representation=getattr(self, "_as_representation", False),
             )
+        print(
+            f"TileTree.refresh_from_db preparing from_queryset took {time.perf_counter() - start_time} seconds"
+        )
+
+        start_time = time.perf_counter()
         self._refresh_aliased_data(using, fields, from_queryset)
+        print(
+            f"TileTree.refresh_from_db _refresh_aliased_data took {time.perf_counter() - start_time} seconds"
+        )
 
     def backfill_parent_tiles(self):
         if self.nodegroup.parentnodegroup_id and not self.parenttile_id:

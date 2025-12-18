@@ -250,7 +250,11 @@ class ArchesModelAPIMixin:
         https://github.com/encode/django-rest-framework/discussions/7850
         """
         try:
+            import time
+
+            start_time = time.perf_counter()
             serializer.save()
+            print(f"Serializer save took {time.perf_counter() - start_time} seconds")
         except DjangoValidationError as django_error:
             flattened_errors = self.flatten_validation_errors(django_error)
             if isinstance(flattened_errors, dict):
