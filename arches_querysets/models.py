@@ -3,6 +3,7 @@ import uuid
 from types import SimpleNamespace
 from typing import Mapping
 
+from django.conf import settings
 from django.core.exceptions import (
     MultipleObjectsReturned,
     ObjectDoesNotExist,
@@ -32,7 +33,8 @@ from arches_querysets.utils.models import (
     ensure_request,
     pop_arches_model_kwargs,
 )
-
+from arches_querysets.tasks import index_resource
+import arches.app.utils.task_management as task_management
 
 logger = logging.getLogger(__name__)
 
@@ -278,7 +280,14 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
 
         start_time = time.perf_counter()
         if index:
-            proxy_resource.index()
+            if (
+                hasattr(settings, "EVENTUALLY_CONSISTENT_ES_INDEXING")
+                and settings.EVENTUALLY_CONSISTENT_ES_INDEXING
+                and task_management.check_if_celery_available()
+            ):  # requires celery
+                index_resource.apply_async((self.resourceinstanceid,))
+            else:
+                proxy_resource.index()
         print(
             f"ResourceTileTree._save_aliased_data index took {time.perf_counter() - start_time} seconds"
         )
@@ -717,8 +726,16 @@ class TileTree(TileModel, AliasedDataMixin):
             .get()
         )
         proxy_resource.save_descriptors()
+
         if index:
-            proxy_resource.index()
+            if (
+                hasattr(settings, "EVENTUALLY_CONSISTENT_ES_INDEXING")
+                and settings.EVENTUALLY_CONSISTENT_ES_INDEXING
+                and task_management.check_if_celery_available()
+            ):  # requires celery
+                index_resource.apply_async((self.resourceinstanceid,))
+            else:
+                proxy_resource.index()
 
         self.refresh_from_db(
             using=kwargs.get("using", None),
