@@ -153,13 +153,11 @@ class TileTreeOperation:
         not in the payload.
         HTTP PATCH should request delete_missing_tiles=False (default).
         """
-        original_tile_data_by_tile_id = {}
         incoming_tiles = set()
         if isinstance(self.entry, TileModel):
             self._update_tile(
                 self.grouping_nodes_by_nodegroup_id[self.entry.nodegroup_id],
                 None,
-                original_tile_data_by_tile_id,
                 incoming_tiles=incoming_tiles,
                 delete_siblings=False,
             )
@@ -170,7 +168,6 @@ class TileTreeOperation:
                 self._update_tile(
                     grouping_node,
                     self.entry,
-                    original_tile_data_by_tile_id,
                     incoming_tiles=incoming_tiles,
                     delete_siblings=delete_missing_tiles,
                 )
@@ -187,7 +184,6 @@ class TileTreeOperation:
         self,
         grouping_node,
         container,
-        original_tile_data_by_tile_id,
         incoming_tiles,
         delete_siblings=False,
     ):
@@ -248,7 +244,6 @@ class TileTreeOperation:
                     new_tile.pk = uuid.uuid4()
                 to_insert.add(new_tile)
             else:
-                original_tile_data_by_tile_id[existing_tile.pk] = {**existing_tile.data}
                 existing_tile._incoming_tile = new_tile
                 to_update.add(existing_tile)
 
@@ -265,7 +260,6 @@ class TileTreeOperation:
                         child_nodegroup.pk
                     ],
                     container=tile._incoming_tile,
-                    original_tile_data_by_tile_id=original_tile_data_by_tile_id,
                     incoming_tiles=incoming_tiles,
                     delete_siblings=delete_siblings,
                 )
@@ -276,9 +270,8 @@ class TileTreeOperation:
 
         for tile in to_insert | to_update:
             # Remove no-op upserts.
-            if (
-                original_data := original_tile_data_by_tile_id.pop(tile.pk, None)
-            ) and tile._tile_update_is_noop(original_data):
+            if(tile._tile_update_is_noop(tile.data)):
+
                 to_update.remove(tile)
 
         self.to_insert |= to_insert
