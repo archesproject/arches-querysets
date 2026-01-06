@@ -131,7 +131,9 @@ class TileTreeOperation:
             return ret
 
     def validate_and_save_tiles(self):
-        delete_missing_tiles = self.request.GET.get("delete_missing_tiles", "").lower() == "true"
+        delete_missing_tiles = (
+            self.request.GET.get("delete_missing_tiles", "").lower() == "true"
+        )
         self.validate(delete_missing_tiles=delete_missing_tiles)
         try:
             self._save()
@@ -196,12 +198,19 @@ class TileTreeOperation:
             incoming_tiles.update(new_tiles)
         except KeyError:
             if delete_missing_tiles:
-                for existing_tile in self.existing_tiles_by_nodegroup_alias[grouping_node.alias]:
+                for existing_tile in self.existing_tiles_by_nodegroup_alias[
+                    grouping_node.alias
+                ]:
                     if str(existing_tile.nodegroup_id) in self.deletable_nodegroups:
-                        print("DEBUG: Deleting tile due to missing incoming tiles for alias", grouping_node.alias, "tile id", str(existing_tile.pk))
+                        print(
+                            "DEBUG: Deleting tile due to missing incoming tiles for alias",
+                            grouping_node.alias,
+                            "tile id",
+                            str(existing_tile.pk),
+                        )
                         self.to_delete.add(existing_tile)
             return
-        
+
         existing_tiles = self.existing_tiles_by_nodegroup_alias[grouping_node.alias]
         if not existing_tiles:
             next_sort_order = 0
@@ -264,13 +273,13 @@ class TileTreeOperation:
                     delete_missing_tiles=delete_missing_tiles,
                 )
             self._validate_and_patch_incoming_values(tile, nodes=nodes)
-            
+
             if tile._state.adding:
                 tile.set_missing_keys_to_none()
 
         for tile in to_update:
             # Remove no-op upserts.
-            if(tile._tile_update_is_noop(tile.data)):
+            if tile._tile_update_is_noop(tile.data):
                 to_update.remove(tile)
 
         self.to_insert |= to_insert
@@ -280,7 +289,7 @@ class TileTreeOperation:
         for tile in incoming_tiles:
             if tile in self.to_delete:
                 # Need to remove tiles flagged for deletion if they are
-                # being upserted.  This can happen becuase of the way cardinality n tiles 
+                # being upserted.  This can happen becuase of the way cardinality n tiles
                 # are processed within separate _update_tile() calls.
                 # print("DEBUG: Removing tile from delete set because it is being upserted, tile id", str(tile.pk))
                 self.to_delete.remove(tile)
