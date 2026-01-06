@@ -131,7 +131,8 @@ class TileTreeOperation:
             return ret
 
     def validate_and_save_tiles(self):
-        self.validate()
+        delete_missing_tiles = self.request.GET.get("delete_missing_tiles", "").lower() == "true"
+        self.validate(delete_missing_tiles=delete_missing_tiles)
         try:
             self._save()
         except ProgrammingError as e:
@@ -144,20 +145,22 @@ class TileTreeOperation:
             raise
         self.after_update_all()
 
-    def validate(self, delete_absent_children=False):
+    def validate(self, delete_missing_tiles=False):
         """Move values from resource or tile to prefetched tiles, and validate.
         Raises ValidationError if new data fails datatype validation.
 
-        HTTP PUT should request delete_absent_children=True to delete child tiles
+        HTTP PUT should request delete_missing_tiles=True to delete child tiles
         not in the payload.
-        HTTP PATCH should request delete_absent_children=False (default).
+        HTTP PATCH should request delete_missing_tiles=False (default).
         """
         original_tile_data_by_tile_id = {}
+        incoming_tiles = set()
         if isinstance(self.entry, TileModel):
             self._update_tile(
                 self.grouping_nodes_by_nodegroup_id[self.entry.nodegroup_id],
                 None,
                 original_tile_data_by_tile_id,
+                incoming_tiles=incoming_tiles,
                 delete_siblings=False,
             )
         else:
@@ -168,7 +171,8 @@ class TileTreeOperation:
                     grouping_node,
                     self.entry,
                     original_tile_data_by_tile_id,
-                    delete_siblings=delete_absent_children,
+                    incoming_tiles=incoming_tiles,
+                    delete_siblings=delete_missing_tiles,
                 )
 
         if self.errors_by_node_alias:
@@ -184,6 +188,7 @@ class TileTreeOperation:
         grouping_node,
         container,
         original_tile_data_by_tile_id,
+        incoming_tiles,
         delete_siblings=False,
     ):
         if str(grouping_node.nodegroup_id) not in self.editable_nodegroups:
@@ -192,8 +197,15 @@ class TileTreeOperation:
 
         try:
             new_tiles = self._extract_incoming_tiles(container, grouping_node)
+            incoming_tiles.update(new_tiles)
         except KeyError:
+            if delete_siblings:
+                for existing_tile in self.existing_tiles_by_nodegroup_alias[grouping_node.alias]:
+                    if str(existing_tile.nodegroup_id) in self.deletable_nodegroups:
+                        print("DEBUG: Deleting tile due to missing incoming tiles for alias", grouping_node.alias, "tile id", str(existing_tile.pk))
+                        self.to_delete.add(existing_tile)
             return
+        
         existing_tiles = self.existing_tiles_by_nodegroup_alias[grouping_node.alias]
         if not existing_tiles:
             next_sort_order = 0
@@ -210,6 +222,7 @@ class TileTreeOperation:
         to_insert = set()
         to_update = set()
         to_delete = set()
+
         for existing_tile, new_tile in self._pair_tiles(existing_tiles, new_tiles):
             if new_tile is NOT_PROVIDED:
                 if (
@@ -218,6 +231,7 @@ class TileTreeOperation:
                 ):
                     to_delete.add(existing_tile)
                 continue
+
             if existing_tile is NOT_PROVIDED:
                 new_tile.nodegroup_id = grouping_node.nodegroup_id
                 new_tile.resourceinstance_id = self.resourceid
@@ -252,10 +266,13 @@ class TileTreeOperation:
                     ],
                     container=tile._incoming_tile,
                     original_tile_data_by_tile_id=original_tile_data_by_tile_id,
+                    incoming_tiles=incoming_tiles,
                     delete_siblings=delete_siblings,
                 )
             self._validate_and_patch_incoming_values(tile, nodes=nodes)
-            tile.set_missing_keys_to_none()
+            
+            if tile._state.adding:
+                tile.set_missing_keys_to_none()
 
         for tile in to_insert | to_update:
             # Remove no-op upserts.
@@ -267,6 +284,14 @@ class TileTreeOperation:
         self.to_insert |= to_insert
         self.to_update |= to_update
         self.to_delete |= to_delete
+
+        for tile in incoming_tiles:
+            if tile in self.to_delete:
+                # Need to remove tiles flagged for deletion if they are
+                # being upserted.  This can happen becuase of the way cardinality n tiles 
+                # are processed within separate _update_tile() calls.
+                # print("DEBUG: Removing tile from delete set because it is being upserted, tile id", str(tile.pk))
+                self.to_delete.remove(tile)
 
     def _extract_incoming_tiles(self, container, grouping_node):
         from arches_querysets.models import TileTree
@@ -307,7 +332,7 @@ class TileTreeOperation:
         matched_new_tiles = []
         for existing_tile in existing_tiles:
             for tile in new_tiles:
-                if existing_tile.pk == tile.pk:
+                if str(existing_tile.pk) == str(tile.pk):
                     pairs.append((existing_tile, tile))
                     matched_new_tiles.append(tile)
                     break
