@@ -159,7 +159,7 @@ class TileTreeOperation:
                 self.grouping_nodes_by_nodegroup_id[self.entry.nodegroup_id],
                 None,
                 incoming_tiles=incoming_tiles,
-                delete_siblings=False,
+                delete_missing_tiles=False,
             )
         else:
             for grouping_node in self.grouping_nodes_by_nodegroup_id.values():
@@ -169,7 +169,7 @@ class TileTreeOperation:
                     grouping_node,
                     self.entry,
                     incoming_tiles=incoming_tiles,
-                    delete_siblings=delete_missing_tiles,
+                    delete_missing_tiles=delete_missing_tiles,
                 )
 
         if self.errors_by_node_alias:
@@ -185,7 +185,7 @@ class TileTreeOperation:
         grouping_node,
         container,
         incoming_tiles,
-        delete_siblings=False,
+        delete_missing_tiles=False,
     ):
         if str(grouping_node.nodegroup_id) not in self.editable_nodegroups:
             # Currently also prevents deletes.
@@ -195,7 +195,7 @@ class TileTreeOperation:
             new_tiles = self._extract_incoming_tiles(container, grouping_node)
             incoming_tiles.update(new_tiles)
         except KeyError:
-            if delete_siblings:
+            if delete_missing_tiles:
                 for existing_tile in self.existing_tiles_by_nodegroup_alias[grouping_node.alias]:
                     if str(existing_tile.nodegroup_id) in self.deletable_nodegroups:
                         print("DEBUG: Deleting tile due to missing incoming tiles for alias", grouping_node.alias, "tile id", str(existing_tile.pk))
@@ -222,7 +222,7 @@ class TileTreeOperation:
         for existing_tile, new_tile in self._pair_tiles(existing_tiles, new_tiles):
             if new_tile is NOT_PROVIDED:
                 if (
-                    delete_siblings
+                    delete_missing_tiles
                     and str(existing_tile.nodegroup_id) in self.deletable_nodegroups
                 ):
                     to_delete.add(existing_tile)
@@ -261,7 +261,7 @@ class TileTreeOperation:
                     ],
                     container=tile._incoming_tile,
                     incoming_tiles=incoming_tiles,
-                    delete_siblings=delete_siblings,
+                    delete_missing_tiles=delete_missing_tiles,
                 )
             self._validate_and_patch_incoming_values(tile, nodes=nodes)
             
