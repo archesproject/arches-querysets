@@ -268,7 +268,7 @@ class TileTreeOperation:
             if tile._state.adding:
                 tile.set_missing_keys_to_none()
 
-        for tile in to_insert | to_update:
+        for tile in to_update:
             # Remove no-op upserts.
             if(tile._tile_update_is_noop(tile.data)):
                 to_update.remove(tile)
