@@ -160,7 +160,8 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
         request = ensure_request(request or self._request, force_admin)
 
         if partial is None:
-            http_method = getattr(request, "method", "").upper() if request else ""
+            request_method_value = getattr(request, "method", "") if request else ""
+            http_method = str(request_method_value or "").upper()
 
             if http_method == "PATCH":
                 partial = True
