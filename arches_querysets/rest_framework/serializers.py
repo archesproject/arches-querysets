@@ -748,6 +748,21 @@ class ArchesResourceSerializer(serializers.ModelSerializer, NodeFetcherMixin):
         validated_data["__as_representation"] = True
         return super().create(validated_data)
 
+    def update(self, instance, validated_data):
+        request = self.context.get("request")
+
+        aliased_data = validated_data.pop("aliased_data", None)
+
+        for attribute_name, attribute_value in validated_data.items():
+            setattr(instance, attribute_name, attribute_value)
+
+        if aliased_data is not None:
+            instance.aliased_data = aliased_data
+
+        instance.save(request=request)
+
+        return instance
+
     def get_graph_has_different_publication(self, obj):
         # arches_version==9.0.0
         if arches_version < (8, 0):

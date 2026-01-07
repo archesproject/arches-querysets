@@ -292,14 +292,18 @@ class TileTreeOperation:
                 new_tiles = []
             elif not isinstance(new_tiles, list):
                 new_tiles = [new_tiles]
+
         if all(isinstance(tile, TileTree) for tile in new_tiles):
-            new_tiles.sort(key=attrgetter("sortorder"))
+            new_tiles.sort(
+                key=lambda tile_tree: (tile_tree.sortorder is None, tile_tree.sortorder)
+            )
         else:
             parent_tile = container if isinstance(container, TileTree) else None
             new_tiles = [
                 TileTree.deserialize(tile_dict, parent_tile=parent_tile)
                 for tile_dict in new_tiles
             ]
+
         return new_tiles
 
     def _pair_tiles(self, existing_tiles, new_tiles):
