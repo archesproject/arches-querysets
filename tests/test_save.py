@@ -1,7 +1,10 @@
+import copy
+from uuid import uuid4
 from arches.app.models.models import TileModel
 from django.core.exceptions import ValidationError
 
 from arches_querysets.models import ResourceTileTree, TileTree
+from arches_querysets.utils.models import ensure_request
 from arches_querysets.utils.tests import GraphTestCase
 
 
@@ -108,4 +111,62 @@ class SaveTileTests(GraphTestCase):
             tt.save(force_admin=True)
         self.assertEqual(
             ctx.exception.message_dict, {"datatypes_1": ["Tile Cardinality Error"]}
+        )
+
+    def test_simple_tile_delete(self):
+        request = ensure_request(None, True)
+        request.GET["delete_missing_tiles"] = "true"
+        self.resource_42.aliased_data.datatypes_1 = None
+        self.resource_42.save(request=request, force_admin=True)
+
+        resources = ResourceTileTree.get_tiles(
+            "datatype_lookups", as_representation=True
+        )
+        local_resource_42 = resources.get(pk=self.resource_42.pk)
+        self.assertEqual(local_resource_42.aliased_data.datatypes_1, None)
+
+    def test_cardinality_n_tile_delete(self):
+        request = ensure_request(None, True)
+        request.GET["delete_missing_tiles"] = "true"
+
+        tile_copy = copy.deepcopy(self.datatype_n[0])
+        tile_copy.tileid = uuid4()
+        tile_copy.aliased_data.datatypes_n_child[0].tileid = uuid4()
+
+        self.resource_42.aliased_data.datatypes_n.append(tile_copy)
+        self.resource_42.save(request=request, force_admin=True)
+
+        resources = ResourceTileTree.get_tiles(
+            "datatype_lookups", as_representation=True
+        )
+        local_resource_42 = resources.get(pk=self.resource_42.pk)
+
+        self.assertEqual(
+            len(local_resource_42.aliased_data.datatypes_n),
+            2,
+            "Confirm two tiles before deletion",
+        )
+
+        # now test deletion by restoring the original tiles, effectively
+        # removing the newly added tile and its child tile
+        local_resource_42.aliased_data.datatypes_n = self.datatype_n
+        local_resource_42.save(request=request, force_admin=True)
+
+        resources = ResourceTileTree.get_tiles(
+            "datatype_lookups", as_representation=True
+        )
+        local_resource_42 = resources.get(pk=self.resource_42.pk)
+        self.assertEqual(
+            len(local_resource_42.aliased_data.datatypes_n),
+            1,
+            "Confirm one tile after deletion",
+        )
+        self.assertEqual(
+            len(
+                local_resource_42.aliased_data.datatypes_n[
+                    0
+                ].aliased_data.datatypes_n_child
+            ),
+            1,
+            "Confirm child tile still exists after deletion of sibling tile",
         )
