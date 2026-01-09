@@ -132,7 +132,8 @@ class TileTreeOperation:
 
     def validate_and_save_tiles(self):
         delete_missing_tiles = (
-            self.request.GET.get("delete_missing_tiles", "").lower() == "true"
+            self.request.GET.get("delete_missing_tiles", str(not self.partial)).lower()
+            == "true"
         )
         self.validate(delete_missing_tiles=delete_missing_tiles)
         try:
@@ -163,7 +164,7 @@ class TileTreeOperation:
                 None,
                 original_tile_data_by_tile_id,
                 incoming_tiles=incoming_tiles,
-                delete_missing_tiles=False,
+                delete_missing_tiles=delete_missing_tiles,
             )
         else:
             for grouping_node in self.grouping_nodes_by_nodegroup_id.values():
