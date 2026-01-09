@@ -155,11 +155,13 @@ class TileTreeOperation:
         not in the payload.
         HTTP PATCH should request delete_missing_tiles=False (default).
         """
+        original_tile_data_by_tile_id = {}
         incoming_tiles = set()
         if isinstance(self.entry, TileModel):
             self._update_tile(
                 self.grouping_nodes_by_nodegroup_id[self.entry.nodegroup_id],
                 None,
+                original_tile_data_by_tile_id,
                 incoming_tiles=incoming_tiles,
                 delete_missing_tiles=False,
             )
@@ -170,6 +172,7 @@ class TileTreeOperation:
                 self._update_tile(
                     grouping_node,
                     self.entry,
+                    original_tile_data_by_tile_id,
                     incoming_tiles=incoming_tiles,
                     delete_missing_tiles=delete_missing_tiles,
                 )
@@ -186,6 +189,7 @@ class TileTreeOperation:
         self,
         grouping_node,
         container,
+        original_tile_data_by_tile_id,
         incoming_tiles,
         delete_missing_tiles=False,
     ):
@@ -253,6 +257,7 @@ class TileTreeOperation:
                     new_tile.pk = uuid.uuid4()
                 to_insert.add(new_tile)
             else:
+                original_tile_data_by_tile_id[existing_tile.pk] = {**existing_tile.data}
                 existing_tile._incoming_tile = new_tile
                 to_update.add(existing_tile)
 
@@ -269,17 +274,20 @@ class TileTreeOperation:
                         child_nodegroup.pk
                     ],
                     container=tile._incoming_tile,
+                    original_tile_data_by_tile_id=original_tile_data_by_tile_id,
                     incoming_tiles=incoming_tiles,
                     delete_missing_tiles=delete_missing_tiles,
                 )
             self._validate_and_patch_incoming_values(tile, nodes=nodes)
 
-            if tile._state.adding:
-                tile.set_missing_keys_to_none()
+            tile.set_missing_keys_to_none()
 
-        for tile in to_update:
+        
+        for tile in list(to_update):
             # Remove no-op upserts.
-            if tile._tile_update_is_noop(tile.data):
+            if (
+                original_data := original_tile_data_by_tile_id.pop(tile.pk, None)
+            ) and tile._tile_update_is_noop(original_data):
                 to_update.remove(tile)
 
         self.to_insert |= to_insert
@@ -287,12 +295,11 @@ class TileTreeOperation:
         self.to_delete |= to_delete
 
         for tile in incoming_tiles:
-            if tile in self.to_delete:
-                # Need to remove tiles flagged for deletion if they are
-                # being upserted.  This can happen becuase of the way cardinality n tiles
-                # are processed within separate _update_tile() calls.
-                # print("DEBUG: Removing tile from delete set because it is being upserted, tile id", str(tile.pk))
-                self.to_delete.remove(tile)
+            # Need to remove tiles flagged for deletion if they are
+            # being updated.  This can happen becuase of the way cardinality n tiles
+            # are processed within separate _update_tile() calls.
+            # print("DEBUG: Removing tile from delete set because it is being upserted, tile id", str(tile.pk))
+            self.to_delete.discard(tile)
 
     def _extract_incoming_tiles(self, container, grouping_node):
         from arches_querysets.models import TileTree
