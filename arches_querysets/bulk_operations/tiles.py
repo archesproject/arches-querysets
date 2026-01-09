@@ -282,7 +282,6 @@ class TileTreeOperation:
 
             tile.set_missing_keys_to_none()
 
-        
         for tile in list(to_update):
             # Remove no-op upserts.
             if (
