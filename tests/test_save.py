@@ -149,7 +149,7 @@ class SaveTileTests(GraphTestCase):
 
         # now test deletion by restoring the original tiles, effectively
         # removing the newly added tile and its child tile
-        local_resource_42.aliased_data.datatypes_n = self.datatype_n
+        local_resource_42.aliased_data.datatypes_n = [self.datatype_n[0]]
         local_resource_42.save(request=request, force_admin=True)
 
         resources = ResourceTileTree.get_tiles(
