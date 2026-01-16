@@ -207,12 +207,6 @@ class TileTreeOperation:
                     grouping_node.alias
                 ]:
                     if str(existing_tile.nodegroup_id) in self.deletable_nodegroups:
-                        # print(
-                        #     "DEBUG: Deleting tile due to missing incoming tiles for alias",
-                        #     grouping_node.alias,
-                        #     "tile id",
-                        #     str(existing_tile.pk),
-                        # )
                         self.to_delete.add(existing_tile)
             return
 
