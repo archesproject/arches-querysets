@@ -706,8 +706,7 @@ class TileTree(TileModel, AliasedDataMixin):
 
         if index:
             if (
-                hasattr(settings, "EVENTUALLY_CONSISTENT_ES_INDEXING")
-                and settings.EVENTUALLY_CONSISTENT_ES_INDEXING
+                hasattr(settings, "EVENTUALLY_CONSISTENT_ES_INDEXING", False)
                 and task_management.check_if_celery_available()
             ):
                 index_resource.apply_async((self.resourceinstanceid,))
