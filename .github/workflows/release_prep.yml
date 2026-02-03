@@ -15,6 +15,6 @@ permissions:
 
 jobs:
   increment_version_and_pr:
-    uses: archesproject/reusable-github-workflows/.github/workflows/release-prep.yml@main
+    uses: archesproject/reusable-github-workflows/.github/workflows/release_prep.yml@main
     secrets:
       personal_access_token: ${{ secrets.GITHUB_SECRET }}
