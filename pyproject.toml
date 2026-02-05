@@ -1,17 +1,20 @@
 [build-system]
-requires = ["setuptools>=77", "setuptools-scm"]
+requires = [ "setuptools>=77", "setuptools-scm",]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "arches-querysets"
-readme = "README.md"
-authors = [
-    {name = "Arches Project"}
-]
-license = "AGPL-3.0-or-later"
+version = "1.1.0a0"
 description = "A Django-native interface for Arches implementers to express application logic, query business data, and build APIs."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "AGPL-3.0-or-later"
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 3 - Alpha",
+    "Framework :: Django",
+    "Framework :: Django :: 4.2",
+    "Framework :: Django :: 5.2",
+    "Intended Audience :: Developers",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
@@ -19,20 +22,12 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "Framework :: Django",
-    "Framework :: Django :: 4.2",
-    "Framework :: Django :: 5.2",
-    "Intended Audience :: Developers",
 ]
-requires-python = ">=3.10"
-dependencies = [
-    "arches>=7.6.12,<8.2.0,!=8.0.0",
-]
+dependencies = [ "arches!=8.0.0,<8.2.0,>=7.6.12",]
+dynamic = []
 
-version = "1.1.0a0"
-
-[project.optional-dependencies]
-drf = ["djangorestframework~=3.16"]
+[[project.authors]]
+name = "Arches Project"
 
 [project.urls]
 Homepage = "https://archesproject.org/"
@@ -40,15 +35,11 @@ Documentation = "https://arches.readthedocs.io"
 Repository = "https://github.com/archesproject/arches-querysets.git"
 Issues = "https://github.com/archesproject/arches-querysets/issues"
 
-[dependency-groups]
-dev = [
-    "black==24.4.2",
-    "coverage",
-    "django-silk==5.3.2",
-    "livereload",
-    "pre-commit==4.1.0",
-    "sst",
-]
+[project.optional-dependencies]
+drf = [ "djangorestframework~=3.16",]
 
 [tool.setuptools.packages.find]
-include = ["arches_querysets*"]
+include = [ "arches_querysets*",]
+
+[dependency-groups]
+dev = [ "black==24.4.2", "coverage", "django-silk==5.3.2", "livereload", "pre-commit==4.1.0", "sst",]
