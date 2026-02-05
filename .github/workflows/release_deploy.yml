@@ -4,6 +4,7 @@ on:
   pull_request:
     types: [closed]
     branches:
+      - '*'
       - 'release_alpha'
       - 'release_beta'
       - 'release_patch'
