@@ -4,11 +4,7 @@ on:
   pull_request:
     types: [closed]
     branches:
-      - 'release_alpha'
-      - 'release_beta'
-      - 'release_patch'
-      - 'release_minor'
-      - 'release_major'
+      - 'dev/*'
 
 permissions:
   contents: write
