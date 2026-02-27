@@ -344,7 +344,7 @@ class TileTree(TileModel, AliasedDataMixin):
         edit logging, search index cleanup, and datatype post-delete
         side effects all run."""
         tile = Tile.objects.get(pk=self.pk)
-        tile.delete(*args, request=request, **kwargs)
+        return tile.delete(*args, request=request, **kwargs)
 
     def save(
         self, *, request=None, index=True, partial=True, force_admin=False, **kwargs
