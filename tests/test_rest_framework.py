@@ -5,7 +5,10 @@ from unittest.mock import patch
 
 from django.core.management import call_command
 from django.urls import reverse
-from arches import VERSION as arches_version
+from arches import __version__ as _arches_version_str
+from packaging.version import Version
+
+arches_version = Version(_arches_version_str)
 from arches.app.models.graph import Graph
 from arches.app.models.models import EditLog
 
@@ -226,7 +229,7 @@ class RestFrameworkTests(GraphTestCase):
             },
         )
 
-    @unittest.skipIf(arches_version < (8, 0), reason="Arches 8+ only logic")
+    @unittest.skipIf(arches_version < Version("8.0"), reason="Arches 8+ only logic")
     def test_out_of_date_resource(self):
         Graph.objects.get(pk=self.graph.pk).publish(user=None)
 
