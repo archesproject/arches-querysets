@@ -4,6 +4,7 @@ from itertools import chain
 
 from arches import __version__ as _arches_version_str
 from packaging.version import Version
+
 arches_version = Version(_arches_version_str)
 from arches.app.datatypes import datatypes
 from arches.app.models import models

@@ -21,6 +21,7 @@ from django.utils.functional import cached_property
 
 from arches import __version__ as _arches_version_str
 from packaging.version import Version
+
 arches_version = Version(_arches_version_str)
 from arches.app.models.models import ResourceInstance, TileModel
 

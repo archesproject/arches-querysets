@@ -13,6 +13,7 @@ from rest_framework.fields import empty
 
 from arches import __version__ as _arches_version_str
 from packaging.version import Version
+
 arches_version = Version(_arches_version_str)
 from arches.app.models.fields.i18n import I18n_JSON, I18n_String
 from arches.app.models.models import GraphModel, Node, NodeGroup

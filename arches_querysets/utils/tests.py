@@ -6,6 +6,7 @@ from django.test import TestCase
 
 from arches import __version__ as _arches_version_str
 from packaging.version import Version
+
 arches_version = Version(_arches_version_str)
 from arches.app.models.graph import Graph
 from arches.app.models.models import (

@@ -14,6 +14,7 @@ from django.utils.translation import gettext as _
 
 from arches import __version__ as _arches_version_str
 from packaging.version import Version
+
 arches_version = Version(_arches_version_str)
 from arches.app.models.models import GraphModel, ResourceInstance, TileModel
 from arches.app.models.resource import Resource

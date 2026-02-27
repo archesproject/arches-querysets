@@ -7,6 +7,7 @@ from django.core.management import call_command
 from django.urls import reverse
 from arches import __version__ as _arches_version_str
 from packaging.version import Version
+
 arches_version = Version(_arches_version_str)
 from arches.app.models.graph import Graph
 from arches.app.models.models import EditLog
