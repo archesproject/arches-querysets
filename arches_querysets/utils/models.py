@@ -19,7 +19,7 @@ from django.db.models.fields.json import KT
 from django.http import HttpRequest
 from django.utils.functional import cached_property
 
-from arches import VERSION as arches_version
+from arches import __version__ as arches_version
 from arches.app.models.models import ResourceInstance, TileModel
 
 from arches_querysets.datatypes.datatypes import DataTypeFactory

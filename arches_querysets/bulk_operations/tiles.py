@@ -8,7 +8,7 @@ from django.db import ProgrammingError, transaction
 from django.db.models import F, Q
 from django.utils.translation import get_language, gettext as _
 
-from arches import VERSION as arches_version
+from arches import __version__ as arches_version
 from arches.app.models.models import (
     CardXNodeXWidget,
     Language,

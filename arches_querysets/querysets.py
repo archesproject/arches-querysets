@@ -8,7 +8,7 @@ from django.db.models.query import ModelIterable
 from django.utils.functional import cached_property
 from django.utils.translation import gettext as _
 
-from arches import VERSION as arches_version
+from arches import __version__ as arches_version
 from arches.app.models.models import Node
 
 from arches_querysets.datatypes.datatypes import DataTypeFactory

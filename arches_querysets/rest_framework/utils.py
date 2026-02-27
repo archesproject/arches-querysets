@@ -1,6 +1,6 @@
 from django.db import models
 
-from arches import VERSION as arches_version
+from arches import __version__ as arches_version
 from arches.app.models.models import Node
 
 

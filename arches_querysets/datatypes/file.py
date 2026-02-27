@@ -1,6 +1,6 @@
 from django.utils.translation import get_language
 
-from arches import VERSION as arches_version
+from arches import __version__ as arches_version
 from arches.app.datatypes import datatypes
 from arches.app.models import models
 from arches.app.models.models import File

@@ -10,7 +10,7 @@ from rest_framework import renderers
 from rest_framework import serializers
 from rest_framework.fields import empty
 
-from arches import VERSION as arches_version
+from arches import __version__ as arches_version
 from arches.app.models.fields.i18n import I18n_JSON, I18n_String
 from arches.app.models.models import EditLog, GraphModel, Node, NodeGroup
 from arches.app.models.resource import Resource

@@ -4,7 +4,7 @@ import uuid
 from django.db.models import F, OuterRef, prefetch_related_objects
 from django.test import TestCase
 
-from arches import VERSION as arches_version
+from arches import __version__ as arches_version
 from arches.app.models.graph import Graph
 from arches.app.models.models import (
     CardModel,

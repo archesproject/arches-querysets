@@ -2,7 +2,7 @@ import logging
 import uuid
 from itertools import chain
 
-from arches import VERSION as arches_version
+from arches import __version__ as arches_version
 from arches.app.datatypes import datatypes
 from arches.app.models import models
 from django.utils.translation import get_language

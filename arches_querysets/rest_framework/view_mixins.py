@@ -9,7 +9,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.settings import api_settings
 
-from arches import VERSION as arches_version
+from arches import __version__ as arches_version
 from arches.app.models.models import Node, ResourceInstance, TileModel
 from arches.app.utils.permission_backend import (
     user_can_delete_resource,

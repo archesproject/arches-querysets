@@ -8,7 +8,7 @@ import semantic_version
 from datetime import datetime, timedelta
 from django.utils.translation import gettext_lazy as _
 
-from arches import VERSION as arches_version
+from arches import __version__ as arches_version
 
 try:
     from arches.settings import *
