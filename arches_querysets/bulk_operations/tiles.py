@@ -255,7 +255,6 @@ class TileTreeOperation:
                     new_tile.pk = uuid.uuid4()
                 to_insert.add(new_tile)
             else:
-                # import ipdb; ipdb.set_trace()
                 original_tile_by_tile_id[existing_tile.pk] = {
                     "data": {**existing_tile.data},
                     "sortorder": existing_tile.sortorder,
