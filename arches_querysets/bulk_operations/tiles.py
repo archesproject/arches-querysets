@@ -255,8 +255,13 @@ class TileTreeOperation:
                     new_tile.pk = uuid.uuid4()
                 to_insert.add(new_tile)
             else:
-                original_tile_data_by_tile_id[existing_tile.pk] = {**existing_tile.data}
+                original_tile_data_by_tile_id[existing_tile.pk] = {
+                    **existing_tile.data,
+                    "__sortorder": existing_tile.sortorder,
+                }
                 existing_tile._incoming_tile = new_tile
+                if new_tile.sortorder is not None:
+                    existing_tile.sortorder = new_tile.sortorder
                 to_update.add(existing_tile)
 
         nodes = grouping_node.nodegroup.node_set.all()

@@ -754,6 +754,9 @@ class TileTree(TileModel, AliasedDataMixin):
         given the current implementation that doesn't serialize them."""
 
         datatype_factory = DataTypeFactory()
+        if self.sortorder != original_data["__sortorder"]:
+            return False
+
         for node in self.nodegroup.node_set.all():
             if node.datatype == "semantic":
                 continue
