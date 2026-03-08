@@ -9,10 +9,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.settings import api_settings
 
-from arches import __version__ as _arches_version_str
-from packaging.version import Version
-
-arches_version = Version(_arches_version_str)
+from arches import VERSION as arches_version
 from arches.app.models.models import Node, ResourceInstance, TileModel
 from arches.app.utils.permission_backend import (
     user_can_delete_resource,
@@ -77,7 +74,7 @@ class ArchesModelAPIMixin:
                     resource_ids=self.resource_ids,
                     as_representation=True,
                 ).select_related("graph")
-                if arches_version >= Version("8.0"):
+                if arches_version >= (8, 0):
                     qs = qs.select_related("resource_instance_lifecycle_state")
             elif issubclass(options.model, TileModel):
                 qs = options.model.get_tiles(
@@ -118,7 +115,7 @@ class ArchesModelAPIMixin:
         node_filters = Q(graph__slug=self.graph_slug, nodegroup__isnull=False)
         children = "nodegroup_set"
         # arches_version==9.0.0
-        if arches_version >= Version("8.0"):
+        if arches_version >= (8, 0):
             node_filters &= Q(source_identifier=None)
             children = "children"
 
@@ -148,7 +145,7 @@ class ArchesModelAPIMixin:
         options = self.serializer_class.Meta
         if issubclass(options.model, ResourceInstance):
             # arches_version==9.0.0
-            if arches_version >= Version("8.0"):
+            if arches_version >= (8, 0):
                 permission_kwargs = {"user": self.request.user, "resource": ret}
             else:
                 permission_kwargs = {"user": self.request.user, "resourceid": ret.pk}
