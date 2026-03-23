@@ -23,7 +23,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
 ]
-dependencies = [ "arches!=8.0.0,<8.2.0,>=7.6.12",]
+dependencies = [ "arches!=8.0.0,<9.0.0,>=7.6.22",]
 dynamic = []
 
 [[project.authors]]
