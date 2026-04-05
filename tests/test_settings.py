@@ -73,6 +73,4 @@ SILENCED_SYSTEM_CHECKS.append(
     "arches.W001",  # Cache backend does not support rate-limiting
 )
 
-ELASTICSEARCH_HOSTS = [
-    {"scheme": "http", "host": "localhost", "port": ELASTICSEARCH_HTTP_PORT}
-]
+ELASTICSEARCH_HOSTS = [{"scheme": "http", "host": "localhost", "port": 9202}]

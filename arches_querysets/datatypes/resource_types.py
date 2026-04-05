@@ -71,11 +71,41 @@ class ResourceInstanceDataType(datatypes.ResourceInstanceDataType):
             return None
         return related_resources[0]
 
+    def get_display_value_context_in_bulk(self, values):
+        """Pre-fetch all target ResourceInstance objects for a batch of tile values."""
+        all_resource_ids = []
+        for value in values:
+            for inner_val in value or []:
+                if inner_val and (rid := inner_val.get("resourceId")):
+                    all_resource_ids.append(rid)
+        return models.ResourceInstance.objects.filter(pk__in=all_resource_ids)
+
+    def set_display_value_context_in_bulk(self, datatype_context):
+        if not hasattr(self, "_resource_instance_cache"):
+            self._resource_instance_cache = {}
+        for resource_instance in datatype_context:
+            self._resource_instance_cache[resource_instance.pk] = resource_instance
+
     def get_related_resources(self, value, resource):
         if not value:
             return []
         related_resources = []
 
+        cache = getattr(self, "_resource_instance_cache", None)
+        if cache is not None:
+            for inner_val in value:
+                if not inner_val:
+                    continue
+                target_resource_id = uuid.UUID(inner_val["resourceId"])
+                if target_resource_id in cache:
+                    related_resources.append(cache[target_resource_id])
+                else:
+                    logger.warning(
+                        "Missing ResourceXResource target: %s", target_resource_id
+                    )
+            return related_resources
+
+        # No bulk cache — fall back to per-resource relation queries.
         # arches_version==9.0.0
         if arches_version >= Version("8.0"):
             relations = resource.from_resxres.all()

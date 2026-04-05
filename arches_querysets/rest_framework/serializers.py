@@ -555,20 +555,41 @@ class SingleNodegroupAliasedDataSerializer(TileAliasedDataSerializer):
         exclude_children = True
 
 
+class CachedPrimaryKeyRelatedField(serializers.PrimaryKeyRelatedField):
+    """Like PrimaryKeyRelatedField but caches per-request to avoid repeated DB
+    queries for the same PK.  For a large PUT payload, all 662 tiles reference
+    the same resourceinstance and share only a handful of nodegroups, so without
+    caching DRF issues one queryset.get() per field per tile."""
+
+    _CACHE_ATTR = "_arches_querysets_pk_cache"
+
+    def to_internal_value(self, data):
+        request = self.context.get("request")
+        if request is None:
+            return super().to_internal_value(data)
+        if not hasattr(request, self._CACHE_ATTR):
+            setattr(request, self._CACHE_ATTR, {})
+        cache = getattr(request, self._CACHE_ATTR)
+        key = (self.get_queryset().model, str(data))
+        if key not in cache:
+            cache[key] = super().to_internal_value(data)
+        return cache[key]
+
+
 class ArchesTileSerializer(serializers.ModelSerializer, NodeFetcherMixin):
     # These fields are declared here in full instead of massaged via
     # "extra_kwargs" in class Meta to support subclassing by TileAliasedDataSerializer.
     tileid = serializers.UUIDField(validators=[], required=False, allow_null=True)
-    resourceinstance = serializers.PrimaryKeyRelatedField(
+    resourceinstance = CachedPrimaryKeyRelatedField(
         queryset=ResourceTileTree.objects.all(),
         required=False,
         allow_null=True,
         html_cutoff=0,
     )
-    nodegroup = serializers.PrimaryKeyRelatedField(
+    nodegroup = CachedPrimaryKeyRelatedField(
         queryset=NodeGroup.objects.all(), required=False, allow_null=True, html_cutoff=0
     )
-    parenttile = serializers.PrimaryKeyRelatedField(
+    parenttile = CachedPrimaryKeyRelatedField(
         queryset=TileTree.objects.prefetch_related(None),
         required=False,
         allow_null=True,
@@ -752,6 +773,11 @@ class ArchesResourceSerializer(serializers.ModelSerializer, NodeFetcherMixin):
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
+        import time as _time
+        import logging as _logging
+
+        _log = _logging.getLogger(__name__)
+        _tu0 = _time.perf_counter()
         request = self.context.get("request")
 
         aliased_data = validated_data.pop("aliased_data", None)
@@ -761,9 +787,16 @@ class ArchesResourceSerializer(serializers.ModelSerializer, NodeFetcherMixin):
 
         if aliased_data is not None:
             instance.aliased_data = aliased_data
+        _tu1 = _time.perf_counter()
 
         instance.save(request=request)
+        _tu2 = _time.perf_counter()
 
+        _log.warning(
+            "[TIMING] serializer.update: pre_save=%.3fs save=%.3fs",
+            _tu1 - _tu0,
+            _tu2 - _tu1,
+        )
         return instance
 
     def get_graph_has_different_publication(self, obj):

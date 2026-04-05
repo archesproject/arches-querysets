@@ -17,11 +17,54 @@ class ConceptDataType(concept_types.ConceptDataType):
     def to_python(self, value, **kwargs):
         return self.get_instance(value)
 
+    def to_json(self, tile, node):
+        import logging as _logging
+
+        _log = _logging.getLogger(__name__)
+        data = self.get_tile_data(tile)
+        if not data:
+            return None
+        val = data.get(str(node.nodeid))
+        if val is None:
+            return self.compile_json(tile, node)
+        try:
+            key = uuid.UUID(val)
+        except (TypeError, ValueError):
+            # Unexpected format — fall back to the parent implementation.
+            return super().to_json(tile, node)
+
+        # The datatype instance is a singleton (DataTypeFactory caches it), so
+        # this dict persists across all tiles in the queryset evaluation and
+        # across requests.  Concept values rarely change, making this safe.
+        if not hasattr(self, "_serialized_value_cache"):
+            self._serialized_value_cache = {}
+        cache_miss = key not in self._serialized_value_cache
+        if cache_miss:
+            value_obj = self.get_value(key)
+            self._serialized_value_cache[key] = (
+                JSONSerializer().serializeToPython(value_obj)
+                if value_obj is not None
+                else {}
+            )
+        _log.warning(
+            "[CONCEPT to_json] cache_%s key=%s cache_size=%d",
+            "MISS" if cache_miss else "HIT",
+            key,
+            len(self._serialized_value_cache),
+        )
+        return self.compile_json(tile, node, **self._serialized_value_cache[key])
+
     def get_details(self, value, **kwargs):
         instance = self.get_instance(value)
         if not instance:
             return None
-        return JSONDeserializer().deserialize(JSONSerializer().serialize([instance]))
+        if not hasattr(self, "_details_cache"):
+            self._details_cache = {}
+        if instance.pk not in self._details_cache:
+            self._details_cache[instance.pk] = JSONDeserializer().deserialize(
+                JSONSerializer().serialize([instance])
+            )
+        return self._details_cache[instance.pk]
 
     def get_instance(self, value):
         if value is None:
@@ -60,7 +103,18 @@ class ConceptListDataType(concept_types.ConceptListDataType):
 
     def get_details(self, value, **kwargs):
         instances = self.get_instances(value)
-        return JSONDeserializer().deserialize(JSONSerializer().serialize(instances))
+        if not instances:
+            return []
+        # Cache by the ordered tuple of Value PKs.  Same as ConceptDataType,
+        # the singleton datatype instance makes this safe across tiles/requests.
+        if not hasattr(self, "_details_cache"):
+            self._details_cache = {}
+        cache_key = tuple(instance.pk for instance in instances)
+        if cache_key not in self._details_cache:
+            self._details_cache[cache_key] = JSONDeserializer().deserialize(
+                JSONSerializer().serialize(instances)
+            )
+        return self._details_cache[cache_key]
 
     def get_instances(self, value):
         new_values = []

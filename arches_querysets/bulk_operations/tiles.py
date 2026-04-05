@@ -20,7 +20,7 @@ from arches.app.models.models import (
     ResourceInstance,
     TileModel,
 )
-from arches.app.models.resource import Resource
+from arches.app.models.resource import Resource, time
 from arches.app.models.tile import Tile, TileValidationError
 
 from arches_querysets.datatypes.datatypes import DataTypeFactory
@@ -134,11 +134,25 @@ class TileTreeOperation:
             return ret
 
     def validate_and_save_tiles(self):
+        import time as _time
+
+        _t0 = _time.perf_counter()
+
         delete_missing_tiles = (
             self.request.GET.get("delete_missing_tiles", str(not self.partial)).lower()
             == "true"
         )
         self.validate(delete_missing_tiles=delete_missing_tiles)
+        _t1 = _time.perf_counter()
+        logger.warning(
+            "[TIMING] validate_and_save_tiles / validate(): %.3fs  "
+            "(to_insert=%d, to_update=%d, to_delete=%d)",
+            _t1 - _t0,
+            len(self.to_insert),
+            len(self.to_update),
+            len(self.to_delete),
+        )
+
         try:
             self._save()
         except ProgrammingError as e:
@@ -149,7 +163,15 @@ class TileTreeOperation:
                 msg = _("Tile Cardinality Error")
                 raise ValidationError({nodegroup_alias: msg}) from e
             raise
+        _t2 = _time.perf_counter()
+        logger.warning("[TIMING] validate_and_save_tiles / _save(): %.3fs", _t2 - _t1)
+
         self.after_update_all()
+        _t3 = _time.perf_counter()
+        logger.warning(
+            "[TIMING] validate_and_save_tiles / after_update_all(): %.3fs", _t3 - _t2
+        )
+        logger.warning("[TIMING] validate_and_save_tiles TOTAL: %.3fs", _t3 - _t0)
 
     def validate(self, delete_missing_tiles=False):
         """Move values from resource or tile to prefetched tiles, and validate.
@@ -274,6 +296,8 @@ class TileTreeOperation:
                 to_update.add(existing_tile)
 
         nodes = grouping_node.nodegroup.node_set.all()
+        non_semantic_nodes = [n for n in nodes if n.datatype != "semantic"]
+
         for tile in to_insert | to_update:
             # arches_version==9.0.0
             if arches_version >= Version("8.0"):
@@ -290,6 +314,18 @@ class TileTreeOperation:
                     incoming_tiles=incoming_tiles,
                     delete_missing_tiles=delete_missing_tiles,
                 )
+
+            # Fast path: skip expensive datatype validation for existing tiles
+            # whose incoming data is provably identical to what's already stored.
+            # tile.data stays unmodified, so _tile_update_is_noop() will always
+            # remove it from to_update in the loop below.
+            if tile in to_update:
+                original = original_tile_by_tile_id.get(tile.pk)
+                if original and self._is_incoming_data_unchanged(
+                    tile, original, non_semantic_nodes
+                ):
+                    continue
+
             self._validate_and_patch_incoming_values(tile, nodes=nodes)
 
             tile.set_missing_keys_to_none()
@@ -365,6 +401,49 @@ class TileTreeOperation:
             if new_tile not in matched_new_tiles:
                 pairs.append((NOT_PROVIDED, new_tile))
         return pairs
+
+    def _is_incoming_data_unchanged(self, tile, original_tile, non_semantic_nodes):
+        """Return True only when we can be certain the incoming data is identical
+        to what's already stored, so that the full (and potentially expensive)
+        datatype validation pipeline in _validate_and_patch_incoming_values can
+        be skipped entirely.
+
+        Conservative: returns False whenever the comparison is ambiguous (e.g.
+        the incoming value is absent, the aliased_data format is unrecognised,
+        or the raw value differs from the stored value).  A False result just
+        means we fall through to the normal validation path — never a data loss.
+        """
+        from arches_querysets.models import AliasedData, TileTree
+
+        incoming = tile._incoming_tile
+
+        # Check sortorder: treat None as "keep existing".
+        incoming_sortorder = (
+            incoming.sortorder if incoming.sortorder is not None else tile.sortorder
+        )
+        if incoming_sortorder != original_tile["sortorder"]:
+            return False
+
+        incoming_aliased = incoming.aliased_data
+
+        for node in non_semantic_nodes:
+            node_id_str = str(node.pk)
+            existing_value = original_tile["data"].get(node_id_str)
+
+            if isinstance(incoming_aliased, AliasedData):
+                incoming_value = getattr(incoming_aliased, node.alias, NOT_PROVIDED)
+            elif isinstance(incoming_aliased, dict):
+                incoming_value = incoming_aliased.get(node.alias, NOT_PROVIDED)
+            else:
+                return False  # Unrecognised format — can't determine.
+
+            if incoming_value is NOT_PROVIDED:
+                return False  # Missing value — uncertain.
+
+            if incoming_value != existing_value:
+                return False
+
+        return True
 
     def _validate_and_patch_incoming_values(self, tile, *, nodes):
         """Validate data found on tile._incoming_tile and move it to tile.data.
@@ -472,6 +551,7 @@ class TileTreeOperation:
             raise
 
     def _perform_transaction(self):
+        import time as _time
         from arches_querysets.models import ResourceTileTree
 
         # Instantiate proxy models for now, but TODO: expose this
@@ -492,7 +572,15 @@ class TileTreeOperation:
         delete_proxies = Tile.objects.filter(
             pk__in=[tile.pk for tile in self.to_delete]
         )
+        logger.warning(
+            "[TIMING] _perform_transaction: upserts=%d (insert=%d update=%d) delete=%d",
+            len(upserts),
+            len(self.to_insert),
+            len(self.to_update),
+            len(self.to_delete),
+        )
 
+        _t0 = _time.perf_counter()
         with transaction.atomic(durable=True):
             if not self.for_new_resource:
                 if isinstance(self.entry, ResourceTileTree):
@@ -541,6 +629,10 @@ class TileTreeOperation:
                     provisional_edit_log_details
                 )
                 upsert_proxy._existing_data = vanilla_instance.data
+            _t1 = _time.perf_counter()
+            logger.warning(
+                "[TIMING] _perform_transaction / preSave loop: %.3fs", _t1 - _t0
+            )
 
             for delete_proxy in delete_proxies:
                 delete_proxy._Tile__preDelete(request=self.request)
@@ -571,6 +663,10 @@ class TileTreeOperation:
                 )
             if self.to_delete:
                 TileModel.objects.filter(pk__in=[t.pk for t in self.to_delete]).delete()
+            _t2 = _time.perf_counter()
+            logger.warning(
+                "[TIMING] _perform_transaction / bulk DB ops: %.3fs", _t2 - _t1
+            )
 
             for upsert_tile in upserts:
                 grouping_node = self.grouping_nodes_by_nodegroup_id[
@@ -581,9 +677,17 @@ class TileTreeOperation:
                     datatype.post_tile_save(
                         upsert_tile, str(node.pk), request=self.request
                     )
+            _t3 = _time.perf_counter()
+            logger.warning(
+                "[TIMING] _perform_transaction / post_tile_save loop: %.3fs", _t3 - _t2
+            )
 
             for upsert_proxy in upsert_proxies:
                 upsert_proxy._Tile__postSave()
+            _t4 = _time.perf_counter()
+            logger.warning(
+                "[TIMING] _perform_transaction / __postSave loop: %.3fs", _t4 - _t3
+            )
 
             # Save edits: could be done in bulk once above side effects are un-proxied.
             for insert_proxy in insert_proxies:
@@ -617,6 +721,11 @@ class TileTreeOperation:
                     provisional_edit_log_details=None,
                     transaction_id=self.transaction_id,
                 )
+            _t5 = _time.perf_counter()
+            logger.warning(
+                "[TIMING] _perform_transaction / edit log saves: %.3fs", _t5 - _t4
+            )
+            logger.warning("[TIMING] _perform_transaction TOTAL: %.3fs", _t5 - _t0)
 
     def after_update_all(self):
         for datatype in self.datatype_factory.datatype_instances.values():

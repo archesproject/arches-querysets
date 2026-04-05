@@ -1,3 +1,5 @@
+import logging
+import time
 from functools import partial
 from itertools import chain
 
@@ -23,6 +25,8 @@ from arches.app.utils.string_utils import str_to_bool
 
 from arches_querysets.models import TileTree
 from arches_querysets.utils.models import ensure_request
+
+logger = logging.getLogger(__name__)
 
 
 class MetadataWithWidgetConfig(SimpleMetadata):
@@ -134,7 +138,12 @@ class ArchesModelAPIMixin:
         )
 
     def get_object(self, permission_callable=None, fill_blanks=False):
+        _t_go0 = time.perf_counter()
         ret = super().get_object()
+        logger.warning(
+            "[TIMING] get_object / super().get_object(): %.3fs",
+            time.perf_counter() - _t_go0,
+        )
         if isinstance(ret, TileTree):
             self.graph_nodes = ret.resourceinstance.graph.node_set.all()
         else:
@@ -168,7 +177,14 @@ class ArchesModelAPIMixin:
 
         # Freeze some keyword arguments to the model save() method.
         is_partial_update = self.request.method == "PATCH"
-        ret.save = partial(ret.save, request=self.request, partial=is_partial_update)
+        # Allow callers to skip synchronous Elasticsearch indexing via ?index=false.
+        # Useful when the client will trigger reindexing separately, or when
+        # EVENTUALLY_CONSISTENT_ES_INDEXING is not enabled but sync indexing is
+        # the primary cause of slow PUT/PATCH responses.
+        index = self.request.GET.get("index", "true").lower() != "false"
+        ret.save = partial(
+            ret.save, request=self.request, partial=is_partial_update, index=index
+        )
 
         if fill_blanks:
             ret.fill_blanks()
@@ -223,12 +239,42 @@ class ArchesModelAPIMixin:
         return super().retrieve(request, *args, **kwargs)
 
     def update(self, request, *args, **kwargs):
+        from rest_framework.response import Response
+
         self.get_object = partial(
             self.get_object,
             permission_callable=user_can_edit_resource,
             fill_blanks=self.fill_blanks,
         )
-        return super().update(request, *args, **kwargs)
+
+        # ── TIMING ──────────────────────────────────────────────────────────
+        _t0 = time.perf_counter()
+        is_partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        _t1 = time.perf_counter()
+        logger.warning("[TIMING] get_object: %.3fs", _t1 - _t0)
+
+        serializer = self.get_serializer(
+            instance, data=request.data, partial=is_partial
+        )
+        _t2 = time.perf_counter()
+        serializer.is_valid(raise_exception=True)
+        _t3 = time.perf_counter()
+        logger.warning("[TIMING] serializer.is_valid(): %.3fs", _t3 - _t2)
+
+        self.perform_update(serializer)
+        _t4 = time.perf_counter()
+        logger.warning("[TIMING] perform_update (save): %.3fs", _t4 - _t3)
+
+        if getattr(instance, "_prefetched_objects_cache", None):
+            instance._prefetched_objects_cache = {}
+
+        response = Response(serializer.data)
+        _t5 = time.perf_counter()
+        logger.warning("[TIMING] Response(serializer.data): %.3fs", _t5 - _t4)
+        logger.warning("[TIMING] update() TOTAL: %.3fs", _t5 - _t0)
+        return response
+        # ────────────────────────────────────────────────────────────────────
 
     def destroy(self, request, *args, **kwargs):
         self.get_object = partial(
@@ -252,6 +298,7 @@ class ArchesModelAPIMixin:
         Discussion:
         https://github.com/encode/django-rest-framework/discussions/7850
         """
+        _t_save0 = time.perf_counter()
         try:
             serializer.save()
         except DjangoValidationError as django_error:
@@ -261,6 +308,10 @@ class ArchesModelAPIMixin:
             else:
                 errors = {api_settings.NON_FIELD_ERRORS_KEY: flattened_errors}
             raise ValidationError(errors) from django_error
+        logger.warning(
+            "[TIMING] validate_tile_data_and_save / serializer.save(): %.3fs",
+            time.perf_counter() - _t_save0,
+        )
 
     def perform_create(self, serializer):
         self.validate_tile_data_and_save(serializer)
