@@ -20,7 +20,7 @@ from arches.app.models.models import (
     ResourceInstance,
     TileModel,
 )
-from arches.app.models.resource import Resource, time
+from arches.app.models.resource import Resource
 from arches.app.models.tile import Tile, TileValidationError
 
 from arches_querysets.datatypes.datatypes import DataTypeFactory

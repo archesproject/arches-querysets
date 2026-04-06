@@ -1,4 +1,3 @@
-import logging
 import uuid
 from collections import defaultdict
 from slugify import slugify
@@ -21,7 +20,6 @@ from arches_querysets.utils.models import (
     get_recursive_prefetches,
 )
 
-logger = logging.getLogger(__name__)
 NOT_PROVIDED = object()
 
 

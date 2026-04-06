@@ -1,4 +1,3 @@
-import logging
 from functools import partial
 from itertools import chain
 
@@ -24,8 +23,6 @@ from arches.app.utils.string_utils import str_to_bool
 
 from arches_querysets.models import TileTree
 from arches_querysets.utils.models import ensure_request
-
-logger = logging.getLogger(__name__)
 
 
 class MetadataWithWidgetConfig(SimpleMetadata):
