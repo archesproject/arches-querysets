@@ -318,6 +318,14 @@ class TargetedRefreshTests(GraphTestCase):
             "new-child-value",
         )
 
+    # ------------------------------------------------------------------ #
+    # Helper
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _node_value(v):
+        return v["node_value"] if isinstance(v, dict) else v
+
     def test_insert_cardinality_1_parent_and_child_simultaneously(self):
         """Inserting a cardinality-1 parent + child tile in one save returns both."""
         # Remove the existing datatypes_1 tile and its children.
@@ -359,4 +367,440 @@ class TargetedRefreshTests(GraphTestCase):
         self.assertEqual(
             _node_value(result_child.aliased_data.non_localized_string_alias_child),
             "new-card1-child",
+        )
+
+    # ------------------------------------------------------------------ #
+    # 5. Update existing child tile only (parent unchanged)
+    # ------------------------------------------------------------------ #
+
+    def test_update_card1_1_child_only(self):
+        """Updating a card-1 child (1→1) without touching the parent is reflected."""
+        child_tile = self.r42.aliased_data.datatypes_1.aliased_data.datatypes_1_child
+        new_value = "update-1-1-child-only"
+        self.assertNotEqual(
+            self._node_value(child_tile.aliased_data.non_localized_string_alias_child),
+            new_value,
+        )
+        child_tile.aliased_data.non_localized_string_alias_child = new_value
+        self.r42.save(force_admin=True)
+
+        result_child = self.r42.aliased_data.datatypes_1.aliased_data.datatypes_1_child
+        self.assertIsNotNone(result_child)
+        self.assertEqual(
+            self._node_value(
+                result_child.aliased_data.non_localized_string_alias_child
+            ),
+            new_value,
+        )
+
+    def test_update_card1_n_child_only(self):
+        """Updating a card-n child (1→n) without touching the parent is reflected."""
+        parent_tile = self.r42.aliased_data.datatypes_1
+        children = parent_tile.aliased_data.datatypes_1_n_child
+        self.assertGreater(len(children), 0, "Precondition: >=1 child tile")
+        child_tile = children[0]
+        new_value = "update-1-n-child-only"
+        self.assertNotEqual(
+            self._node_value(
+                child_tile.aliased_data.non_localized_string_alias_1_n_child
+            ),
+            new_value,
+        )
+        child_tile.aliased_data.non_localized_string_alias_1_n_child = new_value
+        self.r42.save(force_admin=True)
+
+        result_children = (
+            self.r42.aliased_data.datatypes_1.aliased_data.datatypes_1_n_child
+        )
+        self.assertEqual(len(result_children), 1)
+        self.assertEqual(
+            self._node_value(
+                result_children[0].aliased_data.non_localized_string_alias_1_n_child
+            ),
+            new_value,
+        )
+
+    def test_update_cardn_1_child_only(self):
+        """Updating a card-1 child (n→1) without touching the parent is reflected."""
+        parent_tile = self.r42.aliased_data.datatypes_n[0]
+        child_tile = parent_tile.aliased_data.datatypes_n_1_child
+        self.assertIsNotNone(child_tile, "Precondition: child tile exists")
+        new_value = "update-n-1-child-only"
+        self.assertNotEqual(
+            self._node_value(
+                child_tile.aliased_data.non_localized_string_alias_n_1_child
+            ),
+            new_value,
+        )
+        child_tile.aliased_data.non_localized_string_alias_n_1_child = new_value
+        self.r42.save(force_admin=True)
+
+        result_child = self.r42.aliased_data.datatypes_n[
+            0
+        ].aliased_data.datatypes_n_1_child
+        self.assertIsNotNone(result_child)
+        self.assertEqual(
+            self._node_value(
+                result_child.aliased_data.non_localized_string_alias_n_1_child
+            ),
+            new_value,
+        )
+
+    def test_update_cardn_n_child_only(self):
+        """Updating a card-n child (n→n) without touching the parent is reflected."""
+        parent_tile = self.r42.aliased_data.datatypes_n[0]
+        children = parent_tile.aliased_data.datatypes_n_child
+        self.assertGreater(len(children), 0, "Precondition: >=1 child tile")
+        child_tile = children[0]
+        new_value = "update-n-n-child-only"
+        self.assertNotEqual(
+            self._node_value(
+                child_tile.aliased_data.non_localized_string_alias_n_child
+            ),
+            new_value,
+        )
+        child_tile.aliased_data.non_localized_string_alias_n_child = new_value
+        self.r42.save(force_admin=True)
+
+        result_children = self.r42.aliased_data.datatypes_n[
+            0
+        ].aliased_data.datatypes_n_child
+        self.assertEqual(len(result_children), 1)
+        self.assertEqual(
+            self._node_value(
+                result_children[0].aliased_data.non_localized_string_alias_n_child
+            ),
+            new_value,
+        )
+
+    # ------------------------------------------------------------------ #
+    # 6. Update parent only — new cardinality combinations (1→n, n→1)
+    # ------------------------------------------------------------------ #
+
+    def test_update_card1_n_parent_only(self):
+        """Updating a card-1 parent (1→n) without touching its card-n children is reflected."""
+        parent_tile = self.r42.aliased_data.datatypes_1
+        children = parent_tile.aliased_data.datatypes_1_n_child
+        self.assertGreater(len(children), 0, "Precondition: >=1 child tile")
+        old_child_value = self._node_value(
+            children[0].aliased_data.non_localized_string_alias_1_n_child
+        )
+        new_parent_value = "update-1-n-parent-only"
+        parent_tile.aliased_data.non_localized_string_alias = new_parent_value
+        self.r42.save(force_admin=True)
+
+        result_parent = self.r42.aliased_data.datatypes_1
+        self.assertEqual(
+            self._node_value(result_parent.aliased_data.non_localized_string_alias),
+            new_parent_value,
+        )
+        result_children = result_parent.aliased_data.datatypes_1_n_child
+        self.assertGreater(len(result_children), 0)
+        self.assertEqual(
+            self._node_value(
+                result_children[0].aliased_data.non_localized_string_alias_1_n_child
+            ),
+            old_child_value,
+            "Child value should be unchanged after parent-only update",
+        )
+
+    def test_update_cardn_1_parent_only(self):
+        """Updating a card-n parent (n→1) without touching its card-1 child is reflected."""
+        parent_tile = self.r42.aliased_data.datatypes_n[0]
+        child_tile = parent_tile.aliased_data.datatypes_n_1_child
+        self.assertIsNotNone(child_tile, "Precondition: child tile exists")
+        old_child_value = self._node_value(
+            child_tile.aliased_data.non_localized_string_alias_n_1_child
+        )
+        new_parent_value = "update-n-1-parent-only"
+        parent_tile.aliased_data.non_localized_string_alias_n = new_parent_value
+        self.r42.save(force_admin=True)
+
+        result_parent = self.r42.aliased_data.datatypes_n[0]
+        self.assertEqual(
+            self._node_value(result_parent.aliased_data.non_localized_string_alias_n),
+            new_parent_value,
+        )
+        result_child = result_parent.aliased_data.datatypes_n_1_child
+        self.assertIsNotNone(result_child)
+        self.assertEqual(
+            self._node_value(
+                result_child.aliased_data.non_localized_string_alias_n_1_child
+            ),
+            old_child_value,
+            "Child value should be unchanged after parent-only update",
+        )
+
+    # ------------------------------------------------------------------ #
+    # 7. Update parent + child together — missing combinations (1→1, 1→n, n→1)
+    # ------------------------------------------------------------------ #
+
+    def test_update_cardinality_1_1_parent_and_child_simultaneously(self):
+        """Updating a card-1 parent and its card-1 child in one save reflects both (1→1)."""
+        parent_tile = self.r42.aliased_data.datatypes_1
+        child_tile = parent_tile.aliased_data.datatypes_1_child
+        self.assertIsNotNone(child_tile, "Precondition: child tile exists")
+
+        new_parent_value = "update-1-1-parent"
+        new_child_value = "update-1-1-child"
+        parent_tile.aliased_data.non_localized_string_alias = new_parent_value
+        child_tile.aliased_data.non_localized_string_alias_child = new_child_value
+        self.r42.save(force_admin=True)
+
+        result_parent = self.r42.aliased_data.datatypes_1
+        self.assertEqual(
+            self._node_value(result_parent.aliased_data.non_localized_string_alias),
+            new_parent_value,
+        )
+        result_child = result_parent.aliased_data.datatypes_1_child
+        self.assertIsNotNone(result_child)
+        self.assertEqual(
+            self._node_value(
+                result_child.aliased_data.non_localized_string_alias_child
+            ),
+            new_child_value,
+        )
+
+    def test_update_cardinality_1_n_parent_and_child_simultaneously(self):
+        """Updating a card-1 parent and its card-n child in one save reflects both (1→n)."""
+        parent_tile = self.r42.aliased_data.datatypes_1
+        children = parent_tile.aliased_data.datatypes_1_n_child
+        self.assertGreater(len(children), 0, "Precondition: >=1 child tile")
+        child_tile = children[0]
+
+        new_parent_value = "update-1-n-parent"
+        new_child_value = "update-1-n-child"
+        parent_tile.aliased_data.non_localized_string_alias = new_parent_value
+        child_tile.aliased_data.non_localized_string_alias_1_n_child = new_child_value
+        self.r42.save(force_admin=True)
+
+        result_parent = self.r42.aliased_data.datatypes_1
+        self.assertEqual(
+            self._node_value(result_parent.aliased_data.non_localized_string_alias),
+            new_parent_value,
+        )
+        result_children = result_parent.aliased_data.datatypes_1_n_child
+        self.assertEqual(len(result_children), 1)
+        self.assertEqual(
+            self._node_value(
+                result_children[0].aliased_data.non_localized_string_alias_1_n_child
+            ),
+            new_child_value,
+        )
+
+    def test_update_cardinality_n_1_parent_and_child_simultaneously(self):
+        """Updating a card-n parent and its card-1 child in one save reflects both (n→1)."""
+        parent_tile = self.r42.aliased_data.datatypes_n[0]
+        child_tile = parent_tile.aliased_data.datatypes_n_1_child
+        self.assertIsNotNone(child_tile, "Precondition: child tile exists")
+
+        new_parent_value = "update-n-1-parent"
+        new_child_value = "update-n-1-child"
+        parent_tile.aliased_data.non_localized_string_alias_n = new_parent_value
+        child_tile.aliased_data.non_localized_string_alias_n_1_child = new_child_value
+        self.r42.save(force_admin=True)
+
+        result_parent = self.r42.aliased_data.datatypes_n[0]
+        self.assertEqual(
+            self._node_value(result_parent.aliased_data.non_localized_string_alias_n),
+            new_parent_value,
+        )
+        result_child = result_parent.aliased_data.datatypes_n_1_child
+        self.assertIsNotNone(result_child)
+        self.assertEqual(
+            self._node_value(
+                result_child.aliased_data.non_localized_string_alias_n_1_child
+            ),
+            new_child_value,
+        )
+
+    # ------------------------------------------------------------------ #
+    # 8. Insert child — missing combinations (1→n, n→1)
+    # ------------------------------------------------------------------ #
+
+    def test_insert_cardinality_1_n_child_into_existing_parent(self):
+        """Appending a new card-n child (1→n) to an existing card-1 parent extends its list."""
+        parent_tile = self.r42.aliased_data.datatypes_1
+        children_before = list(parent_tile.aliased_data.datatypes_1_n_child)
+        self.assertEqual(len(children_before), 1, "Precondition: exactly 1 child tile")
+
+        parent_tile.append_tile("datatypes_1_n_child")
+        new_children = parent_tile.aliased_data.datatypes_1_n_child
+        self.assertEqual(len(new_children), len(children_before) + 1)
+        new_child = new_children[-1]
+        new_child.aliased_data.non_localized_string_alias_1_n_child = (
+            "appended-1-n-child"
+        )
+
+        self.r42.save(force_admin=True)
+
+        result_children = (
+            self.r42.aliased_data.datatypes_1.aliased_data.datatypes_1_n_child
+        )
+        self.assertEqual(len(result_children), len(children_before) + 1)
+        appended = [
+            c
+            for c in result_children
+            if self._node_value(c.aliased_data.non_localized_string_alias_1_n_child)
+            == "appended-1-n-child"
+        ]
+        self.assertEqual(
+            len(appended), 1, "Appended child must have its data in aliased_data"
+        )
+
+    def test_insert_cardinality_n_1_child_into_existing_parent(self):
+        """Inserting a card-1 child (n→1) into an existing card-n parent updates aliased_data."""
+        # resource_none has an empty card-1 child tile; remove it first.
+        parent_tile = self.r_none.aliased_data.datatypes_n[0]
+        parent_tile.aliased_data.datatypes_n_1_child = None
+        self.r_none.save(request=_delete_request(), force_admin=True)
+        self.r_none = _load_resource(self.resource_none)
+
+        parent_tile = self.r_none.aliased_data.datatypes_n[0]
+        self.assertIsNone(
+            parent_tile.aliased_data.datatypes_n_1_child,
+            "Precondition: no card-1 child tile",
+        )
+
+        parent_tile.append_tile("datatypes_n_1_child")
+        new_child = parent_tile.aliased_data.datatypes_n_1_child
+        self.assertIsNotNone(new_child, "append_tile should create a child tile object")
+        new_child.aliased_data.non_localized_string_alias_n_1_child = "new-n-1-child"
+        self.r_none.save(force_admin=True)
+
+        result_parent = self.r_none.aliased_data.datatypes_n[0]
+        result_child = result_parent.aliased_data.datatypes_n_1_child
+        self.assertIsNotNone(
+            result_child, "Child must appear in aliased_data after insert"
+        )
+        self.assertIsInstance(result_child, TileTree)
+        self.assertEqual(
+            self._node_value(
+                result_child.aliased_data.non_localized_string_alias_n_1_child
+            ),
+            "new-n-1-child",
+        )
+
+    # ------------------------------------------------------------------ #
+    # 9. Delete child — missing combinations (1→n, n→1)
+    # ------------------------------------------------------------------ #
+
+    def test_delete_cardinality_1_n_child_updates_parent_list(self):
+        """Removing all card-n children (1→n) clears the parent's aliased_data list."""
+        parent_tile = self.r42.aliased_data.datatypes_1
+        self.assertGreater(
+            len(parent_tile.aliased_data.datatypes_1_n_child),
+            0,
+            "Precondition: >=1 child tile",
+        )
+
+        parent_tile.aliased_data.datatypes_1_n_child = []
+        self.r42.save(request=_delete_request(), force_admin=True)
+
+        result_children = (
+            self.r42.aliased_data.datatypes_1.aliased_data.datatypes_1_n_child
+        )
+        self.assertEqual(
+            len(result_children),
+            0,
+            "All card-n children should be removed from aliased_data",
+        )
+
+    def test_delete_cardinality_n_1_child_clears_parent_aliased_data(self):
+        """Deleting a card-1 child (n→1) sets the parent's aliased_data reference to None."""
+        parent_tile = self.r42.aliased_data.datatypes_n[0]
+        self.assertIsNotNone(
+            parent_tile.aliased_data.datatypes_n_1_child,
+            "Precondition: child tile exists",
+        )
+
+        parent_tile.aliased_data.datatypes_n_1_child = None
+        self.r42.save(request=_delete_request(), force_admin=True)
+
+        result_child = self.r42.aliased_data.datatypes_n[
+            0
+        ].aliased_data.datatypes_n_1_child
+        self.assertIsNone(
+            result_child, "datatypes_n_1_child should be None after deletion"
+        )
+
+    # ------------------------------------------------------------------ #
+    # 10. Insert parent + child simultaneously — missing combinations (1→n, n→1)
+    # ------------------------------------------------------------------ #
+
+    def test_insert_cardinality_1_n_parent_and_child_simultaneously(self):
+        """Inserting a card-1 parent and its card-n child together in one save returns both."""
+        self.r_none.aliased_data.datatypes_1 = None
+        self.r_none.save(request=_delete_request(), force_admin=True)
+        self.r_none = _load_resource(self.resource_none)
+        self.assertIsNone(
+            self.r_none.aliased_data.datatypes_1, "Precondition: no datatypes_1"
+        )
+
+        self.r_none.fill_blanks()
+        new_parent = self.r_none.aliased_data.datatypes_1
+        self.assertIsNotNone(new_parent)
+        new_children = new_parent.aliased_data.datatypes_1_n_child
+        self.assertGreater(
+            len(new_children), 0, "fill_blanks should create a blank card-n child tile"
+        )
+        new_child = new_children[0]
+
+        new_parent.aliased_data.non_localized_string_alias = "new-1-n-parent"
+        new_child.aliased_data.non_localized_string_alias_1_n_child = "new-1-n-child"
+        self.r_none.save(force_admin=True)
+
+        result_parent = self.r_none.aliased_data.datatypes_1
+        self.assertIsNotNone(result_parent, "Parent tile must appear in aliased_data")
+        self.assertIsInstance(result_parent, TileTree)
+        self.assertEqual(
+            self._node_value(result_parent.aliased_data.non_localized_string_alias),
+            "new-1-n-parent",
+        )
+        result_children = result_parent.aliased_data.datatypes_1_n_child
+        self.assertEqual(len(result_children), 1, "One card-n child should be present")
+        self.assertEqual(
+            self._node_value(
+                result_children[0].aliased_data.non_localized_string_alias_1_n_child
+            ),
+            "new-1-n-child",
+        )
+
+    def test_insert_cardinality_n_1_parent_and_child_simultaneously(self):
+        """Inserting a card-n parent and its card-1 child together in one save returns both."""
+        self.r_none.aliased_data.datatypes_n = []
+        self.r_none.save(request=_delete_request(), force_admin=True)
+        self.r_none = _load_resource(self.resource_none)
+        self.assertEqual(
+            self.r_none.aliased_data.datatypes_n,
+            [],
+            "Precondition: no datatypes_n tiles",
+        )
+
+        self.r_none.append_tile("datatypes_n")
+        new_parent = self.r_none.aliased_data.datatypes_n[0]
+        new_child = new_parent.aliased_data.datatypes_n_1_child
+        self.assertIsNotNone(
+            new_child, "append_tile should create a blank card-1 child tile"
+        )
+
+        new_parent.aliased_data.non_localized_string_alias_n = "new-n-1-parent"
+        new_child.aliased_data.non_localized_string_alias_n_1_child = "new-n-1-child"
+        self.r_none.save(force_admin=True)
+
+        result_parents = self.r_none.aliased_data.datatypes_n
+        self.assertEqual(len(result_parents), 1, "One parent tile should be present")
+        result_parent = result_parents[0]
+        self.assertIsInstance(result_parent, TileTree)
+        self.assertEqual(
+            self._node_value(result_parent.aliased_data.non_localized_string_alias_n),
+            "new-n-1-parent",
+        )
+        result_child = result_parent.aliased_data.datatypes_n_1_child
+        self.assertIsNotNone(result_child, "Card-1 child must appear in aliased_data")
+        self.assertEqual(
+            self._node_value(
+                result_child.aliased_data.non_localized_string_alias_n_1_child
+            ),
+            "new-n-1-child",
         )

@@ -288,6 +288,628 @@ class RestFrameworkTests(GraphTestCase):
             "Child tile aliased_data must be refreshed after save, not stale",
         )
 
+    def test_update_resource_with_nested_child_tile(self):
+        """PUT to ArchesResourceDetailView updating a cardinality-n parent + child
+        simultaneously; child value must be fresh in the response.
+
+        Regression test for the dual-object problem in _targeted_refresh_aliased_data:
+        resource._tile_trees (flat list) and parent._tile_trees (nested prefetch) hold
+        separate Python objects for the same DB rows.  TileTreeOperation updates .data
+        in-place on the flat-list objects only; walk_and_patch must use those canonical
+        objects when rebuilding the hierarchy so reprocess_tiles_aliased_data sees the
+        new data.
+        """
+        parent_tile = self.resource_42.aliased_data.datatypes_n[0]
+        child_tile = parent_tile.aliased_data.datatypes_n_child[0]
+
+        update_url = reverse(
+            "arches_querysets:api-resource",
+            kwargs={"graph": "datatype_lookups", "pk": str(self.resource_42.pk)},
+        )
+        request_body = {
+            "aliased_data": {
+                "datatypes_n": [
+                    {
+                        "tileid": str(parent_tile.pk),
+                        "resourceinstance": str(self.resource_42.pk),
+                        "aliased_data": {
+                            "non_localized_string_alias_n": "resource-put-parent-value",
+                            "datatypes_n_child": [
+                                {
+                                    "tileid": str(child_tile.pk),
+                                    "resourceinstance": str(self.resource_42.pk),
+                                    "aliased_data": {
+                                        "non_localized_string_alias_n_child": "resource-put-child-value",
+                                    },
+                                }
+                            ],
+                        },
+                    }
+                ],
+            },
+        }
+
+        self.client.login(username="dev", password="dev")
+        response = self.client.put(
+            update_url, request_body, content_type="application/json"
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK, response.json())
+
+        def _node_value(v):
+            return v["node_value"] if isinstance(v, dict) else v
+
+        parents = response.json()["aliased_data"]["datatypes_n"]
+        self.assertEqual(len(parents), 1)
+
+        # Parent value must be updated.
+        self.assertEqual(
+            _node_value(parents[0]["aliased_data"]["non_localized_string_alias_n"]),
+            "resource-put-parent-value",
+        )
+
+        # Child value must reflect the *just-saved* value, not the pre-save stale value.
+        children = parents[0]["aliased_data"]["datatypes_n_child"]
+        self.assertEqual(len(children), 1)
+        self.assertEqual(
+            _node_value(
+                children[0]["aliased_data"]["non_localized_string_alias_n_child"]
+            ),
+            "resource-put-child-value",
+            "Child tile aliased_data must be refreshed after resource PUT, not stale",
+        )
+
+    # ------------------------------------------------------------------ #
+    # PATCH tile endpoint — parent + child, all cardinality combinations
+    # ------------------------------------------------------------------ #
+
+    def test_insert_and_update_tile_patch_1_1_parent_and_child(self):
+        """PATCH card-1 parent + card-1 child; response must reflect inserted/updated values (1→1)."""
+        parent_tile = self.resource_42.aliased_data.datatypes_1
+        child_tile = parent_tile.aliased_data.datatypes_1_child
+        update_url = reverse(
+            "arches_querysets:api-tile",
+            kwargs={
+                "graph": "datatype_lookups",
+                "nodegroup_alias": "datatypes_1",
+                "pk": parent_tile.pk,
+            },
+        )
+
+        def _nv(v):
+            return v["node_value"] if isinstance(v, dict) else v
+
+        self.client.login(username="dev", password="dev")
+        # First PATCH: insert; response must reflect the inserted values.
+        insert_response = self.client.patch(
+            update_url,
+            {
+                "resourceinstance": str(self.resource_42.pk),
+                "aliased_data": {
+                    "non_localized_string_alias": "initial-1-1-parent",
+                    "datatypes_1_child": {
+                        "tileid": str(child_tile.pk),
+                        "resourceinstance": str(self.resource_42.pk),
+                        "aliased_data": {
+                            "non_localized_string_alias_child": "initial-1-1-child"
+                        },
+                    },
+                },
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(
+            insert_response.status_code, HTTPStatus.OK, insert_response.json()
+        )
+        self.assertEqual(
+            _nv(insert_response.json()["aliased_data"]["non_localized_string_alias"]),
+            "initial-1-1-parent",
+        )
+        insert_child = insert_response.json()["aliased_data"]["datatypes_1_child"]
+        self.assertEqual(
+            _nv(insert_child["aliased_data"]["non_localized_string_alias_child"]),
+            "initial-1-1-child",
+            "Card-1 child must be fresh in tile PATCH insert response (1→1)",
+        )
+
+        # Second PATCH: update; response must reflect the new value, not the stale one.
+        update_response = self.client.patch(
+            update_url,
+            {
+                "resourceinstance": str(self.resource_42.pk),
+                "aliased_data": {
+                    "non_localized_string_alias": "patch-1-1-parent",
+                    "datatypes_1_child": {
+                        "tileid": str(child_tile.pk),
+                        "resourceinstance": str(self.resource_42.pk),
+                        "aliased_data": {
+                            "non_localized_string_alias_child": "patch-1-1-child"
+                        },
+                    },
+                },
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(
+            update_response.status_code, HTTPStatus.OK, update_response.json()
+        )
+        self.assertEqual(
+            _nv(update_response.json()["aliased_data"]["non_localized_string_alias"]),
+            "patch-1-1-parent",
+        )
+        update_child = update_response.json()["aliased_data"]["datatypes_1_child"]
+        self.assertEqual(
+            _nv(update_child["aliased_data"]["non_localized_string_alias_child"]),
+            "patch-1-1-child",
+            "Card-1 child must be fresh in tile PATCH update response (1→1)",
+        )
+
+    def test_insert_and_update_tile_patch_1_n_parent_and_child(self):
+        """PATCH card-1 parent + card-n child; response must reflect inserted/updated values (1→n)."""
+        parent_tile = self.resource_42.aliased_data.datatypes_1
+        child_tile = parent_tile.aliased_data.datatypes_1_n_child[0]
+        update_url = reverse(
+            "arches_querysets:api-tile",
+            kwargs={
+                "graph": "datatype_lookups",
+                "nodegroup_alias": "datatypes_1",
+                "pk": parent_tile.pk,
+            },
+        )
+
+        def _nv(v):
+            return v["node_value"] if isinstance(v, dict) else v
+
+        self.client.login(username="dev", password="dev")
+        # First PATCH: insert; response must reflect the inserted values.
+        insert_response = self.client.patch(
+            update_url,
+            {
+                "resourceinstance": str(self.resource_42.pk),
+                "aliased_data": {
+                    "non_localized_string_alias": "initial-1-n-parent",
+                    "datatypes_1_n_child": [
+                        {
+                            "tileid": str(child_tile.pk),
+                            "resourceinstance": str(self.resource_42.pk),
+                            "aliased_data": {
+                                "non_localized_string_alias_1_n_child": "initial-1-n-child"
+                            },
+                        }
+                    ],
+                },
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(
+            insert_response.status_code, HTTPStatus.OK, insert_response.json()
+        )
+        self.assertEqual(
+            _nv(insert_response.json()["aliased_data"]["non_localized_string_alias"]),
+            "initial-1-n-parent",
+        )
+        insert_children = insert_response.json()["aliased_data"]["datatypes_1_n_child"]
+        self.assertEqual(len(insert_children), 1)
+        self.assertEqual(
+            _nv(
+                insert_children[0]["aliased_data"][
+                    "non_localized_string_alias_1_n_child"
+                ]
+            ),
+            "initial-1-n-child",
+            "Card-n child must be fresh in tile PATCH insert response (1→n)",
+        )
+
+        # Second PATCH: update; response must reflect the new value, not the stale one.
+        update_response = self.client.patch(
+            update_url,
+            {
+                "resourceinstance": str(self.resource_42.pk),
+                "aliased_data": {
+                    "non_localized_string_alias": "patch-1-n-parent",
+                    "datatypes_1_n_child": [
+                        {
+                            "tileid": str(child_tile.pk),
+                            "resourceinstance": str(self.resource_42.pk),
+                            "aliased_data": {
+                                "non_localized_string_alias_1_n_child": "patch-1-n-child"
+                            },
+                        }
+                    ],
+                },
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(
+            update_response.status_code, HTTPStatus.OK, update_response.json()
+        )
+        self.assertEqual(
+            _nv(update_response.json()["aliased_data"]["non_localized_string_alias"]),
+            "patch-1-n-parent",
+        )
+        update_children = update_response.json()["aliased_data"]["datatypes_1_n_child"]
+        self.assertEqual(len(update_children), 1)
+        self.assertEqual(
+            _nv(
+                update_children[0]["aliased_data"][
+                    "non_localized_string_alias_1_n_child"
+                ]
+            ),
+            "patch-1-n-child",
+            "Card-n child must be fresh in tile PATCH update response (1→n)",
+        )
+
+    def test_insert_and_update_tile_patch_n_1_parent_and_child(self):
+        """PATCH card-n parent + card-1 child; response must reflect inserted/updated values (n→1)."""
+        parent_tile = self.resource_42.aliased_data.datatypes_n[0]
+        child_tile = parent_tile.aliased_data.datatypes_n_1_child
+        update_url = reverse(
+            "arches_querysets:api-tile",
+            kwargs={
+                "graph": "datatype_lookups",
+                "nodegroup_alias": "datatypes_n",
+                "pk": parent_tile.pk,
+            },
+        )
+
+        def _nv(v):
+            return v["node_value"] if isinstance(v, dict) else v
+
+        self.client.login(username="dev", password="dev")
+        # First PATCH: insert; response must reflect the inserted values.
+        insert_response = self.client.patch(
+            update_url,
+            {
+                "resourceinstance": str(self.resource_42.pk),
+                "aliased_data": {
+                    "non_localized_string_alias_n": "initial-n-1-parent",
+                    "datatypes_n_1_child": {
+                        "tileid": str(child_tile.pk),
+                        "resourceinstance": str(self.resource_42.pk),
+                        "aliased_data": {
+                            "non_localized_string_alias_n_1_child": "initial-n-1-child"
+                        },
+                    },
+                },
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(
+            insert_response.status_code, HTTPStatus.OK, insert_response.json()
+        )
+        self.assertEqual(
+            _nv(insert_response.json()["aliased_data"]["non_localized_string_alias_n"]),
+            "initial-n-1-parent",
+        )
+        insert_child = insert_response.json()["aliased_data"]["datatypes_n_1_child"]
+        self.assertEqual(
+            _nv(insert_child["aliased_data"]["non_localized_string_alias_n_1_child"]),
+            "initial-n-1-child",
+            "Card-1 child must be fresh in tile PATCH insert response (n→1)",
+        )
+
+        # Second PATCH: update; response must reflect the new value, not the stale one.
+        update_response = self.client.patch(
+            update_url,
+            {
+                "resourceinstance": str(self.resource_42.pk),
+                "aliased_data": {
+                    "non_localized_string_alias_n": "patch-n-1-parent",
+                    "datatypes_n_1_child": {
+                        "tileid": str(child_tile.pk),
+                        "resourceinstance": str(self.resource_42.pk),
+                        "aliased_data": {
+                            "non_localized_string_alias_n_1_child": "patch-n-1-child"
+                        },
+                    },
+                },
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(
+            update_response.status_code, HTTPStatus.OK, update_response.json()
+        )
+        self.assertEqual(
+            _nv(update_response.json()["aliased_data"]["non_localized_string_alias_n"]),
+            "patch-n-1-parent",
+        )
+        update_child = update_response.json()["aliased_data"]["datatypes_n_1_child"]
+        self.assertEqual(
+            _nv(update_child["aliased_data"]["non_localized_string_alias_n_1_child"]),
+            "patch-n-1-child",
+            "Card-1 child must be fresh in tile PATCH update response (n→1)",
+        )
+
+    # ------------------------------------------------------------------ #
+    # PUT resource endpoint — parent + child, all cardinality combinations
+    # ------------------------------------------------------------------ #
+
+    def test_insert_and_update_resource_put_1_1_parent_and_child(self):
+        """PUT resource with card-1 parent + card-1 child; response must reflect inserted/updated values (1→1)."""
+        parent_tile = self.resource_42.aliased_data.datatypes_1
+        child_tile = parent_tile.aliased_data.datatypes_1_child
+        update_url = reverse(
+            "arches_querysets:api-resource",
+            kwargs={"graph": "datatype_lookups", "pk": str(self.resource_42.pk)},
+        )
+
+        def _nv(v):
+            return v["node_value"] if isinstance(v, dict) else v
+
+        self.client.login(username="dev", password="dev")
+        # First PUT: insert; response must reflect the inserted values.
+        insert_response = self.client.put(
+            update_url,
+            {
+                "aliased_data": {
+                    "datatypes_1": {
+                        "tileid": str(parent_tile.pk),
+                        "resourceinstance": str(self.resource_42.pk),
+                        "aliased_data": {
+                            "non_localized_string_alias": "initial-1-1-parent",
+                            "datatypes_1_child": {
+                                "tileid": str(child_tile.pk),
+                                "resourceinstance": str(self.resource_42.pk),
+                                "aliased_data": {
+                                    "non_localized_string_alias_child": "initial-1-1-child"
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(
+            insert_response.status_code, HTTPStatus.OK, insert_response.json()
+        )
+        insert_parent = insert_response.json()["aliased_data"]["datatypes_1"]
+        self.assertEqual(
+            _nv(insert_parent["aliased_data"]["non_localized_string_alias"]),
+            "initial-1-1-parent",
+        )
+        insert_child = insert_parent["aliased_data"]["datatypes_1_child"]
+        self.assertEqual(
+            _nv(insert_child["aliased_data"]["non_localized_string_alias_child"]),
+            "initial-1-1-child",
+            "Card-1 child must be fresh in resource PUT insert response (1→1)",
+        )
+
+        # Second PUT: update; response must reflect the new value, not the stale one.
+        update_response = self.client.put(
+            update_url,
+            {
+                "aliased_data": {
+                    "datatypes_1": {
+                        "tileid": str(parent_tile.pk),
+                        "resourceinstance": str(self.resource_42.pk),
+                        "aliased_data": {
+                            "non_localized_string_alias": "put-1-1-parent",
+                            "datatypes_1_child": {
+                                "tileid": str(child_tile.pk),
+                                "resourceinstance": str(self.resource_42.pk),
+                                "aliased_data": {
+                                    "non_localized_string_alias_child": "put-1-1-child"
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(
+            update_response.status_code, HTTPStatus.OK, update_response.json()
+        )
+        update_parent = update_response.json()["aliased_data"]["datatypes_1"]
+        self.assertEqual(
+            _nv(update_parent["aliased_data"]["non_localized_string_alias"]),
+            "put-1-1-parent",
+        )
+        update_child = update_parent["aliased_data"]["datatypes_1_child"]
+        self.assertEqual(
+            _nv(update_child["aliased_data"]["non_localized_string_alias_child"]),
+            "put-1-1-child",
+            "Card-1 child must be fresh in resource PUT update response (1→1)",
+        )
+
+    def test_insert_and_update_resource_put_1_n_parent_and_child(self):
+        """PUT resource with card-1 parent + card-n child; response must reflect inserted/updated values (1→n)."""
+        parent_tile = self.resource_42.aliased_data.datatypes_1
+        child_tile = parent_tile.aliased_data.datatypes_1_n_child[0]
+        update_url = reverse(
+            "arches_querysets:api-resource",
+            kwargs={"graph": "datatype_lookups", "pk": str(self.resource_42.pk)},
+        )
+
+        def _nv(v):
+            return v["node_value"] if isinstance(v, dict) else v
+
+        self.client.login(username="dev", password="dev")
+        # First PUT: insert; response must reflect the inserted values.
+        insert_response = self.client.put(
+            update_url,
+            {
+                "aliased_data": {
+                    "datatypes_1": {
+                        "tileid": str(parent_tile.pk),
+                        "resourceinstance": str(self.resource_42.pk),
+                        "aliased_data": {
+                            "non_localized_string_alias": "initial-1-n-parent",
+                            "datatypes_1_n_child": [
+                                {
+                                    "tileid": str(child_tile.pk),
+                                    "resourceinstance": str(self.resource_42.pk),
+                                    "aliased_data": {
+                                        "non_localized_string_alias_1_n_child": "initial-1-n-child"
+                                    },
+                                }
+                            ],
+                        },
+                    },
+                },
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(
+            insert_response.status_code, HTTPStatus.OK, insert_response.json()
+        )
+        insert_parent = insert_response.json()["aliased_data"]["datatypes_1"]
+        self.assertEqual(
+            _nv(insert_parent["aliased_data"]["non_localized_string_alias"]),
+            "initial-1-n-parent",
+        )
+        insert_children = insert_parent["aliased_data"]["datatypes_1_n_child"]
+        self.assertEqual(len(insert_children), 1)
+        self.assertEqual(
+            _nv(
+                insert_children[0]["aliased_data"][
+                    "non_localized_string_alias_1_n_child"
+                ]
+            ),
+            "initial-1-n-child",
+            "Card-n child must be fresh in resource PUT insert response (1→n)",
+        )
+
+        # Second PUT: update; response must reflect the new value, not the stale one.
+        update_response = self.client.put(
+            update_url,
+            {
+                "aliased_data": {
+                    "datatypes_1": {
+                        "tileid": str(parent_tile.pk),
+                        "resourceinstance": str(self.resource_42.pk),
+                        "aliased_data": {
+                            "non_localized_string_alias": "put-1-n-parent",
+                            "datatypes_1_n_child": [
+                                {
+                                    "tileid": str(child_tile.pk),
+                                    "resourceinstance": str(self.resource_42.pk),
+                                    "aliased_data": {
+                                        "non_localized_string_alias_1_n_child": "put-1-n-child"
+                                    },
+                                }
+                            ],
+                        },
+                    },
+                },
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(
+            update_response.status_code, HTTPStatus.OK, update_response.json()
+        )
+        update_parent = update_response.json()["aliased_data"]["datatypes_1"]
+        self.assertEqual(
+            _nv(update_parent["aliased_data"]["non_localized_string_alias"]),
+            "put-1-n-parent",
+        )
+        update_children = update_parent["aliased_data"]["datatypes_1_n_child"]
+        self.assertEqual(len(update_children), 1)
+        self.assertEqual(
+            _nv(
+                update_children[0]["aliased_data"][
+                    "non_localized_string_alias_1_n_child"
+                ]
+            ),
+            "put-1-n-child",
+            "Card-n child must be fresh in resource PUT update response (1→n)",
+        )
+
+    def test_insert_and_update_resource_put_n_1_parent_and_child(self):
+        """PUT resource with card-n parent + card-1 child; response must reflect inserted/updated values (n→1)."""
+        parent_tile = self.resource_42.aliased_data.datatypes_n[0]
+        child_tile = parent_tile.aliased_data.datatypes_n_1_child
+        update_url = reverse(
+            "arches_querysets:api-resource",
+            kwargs={"graph": "datatype_lookups", "pk": str(self.resource_42.pk)},
+        )
+
+        def _nv(v):
+            return v["node_value"] if isinstance(v, dict) else v
+
+        self.client.login(username="dev", password="dev")
+        # First PUT: insert; response must reflect the inserted values.
+        insert_response = self.client.put(
+            update_url,
+            {
+                "aliased_data": {
+                    "datatypes_n": [
+                        {
+                            "tileid": str(parent_tile.pk),
+                            "resourceinstance": str(self.resource_42.pk),
+                            "aliased_data": {
+                                "non_localized_string_alias_n": "initial-n-1-parent",
+                                "datatypes_n_1_child": {
+                                    "tileid": str(child_tile.pk),
+                                    "resourceinstance": str(self.resource_42.pk),
+                                    "aliased_data": {
+                                        "non_localized_string_alias_n_1_child": "initial-n-1-child"
+                                    },
+                                },
+                            },
+                        }
+                    ],
+                },
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(
+            insert_response.status_code, HTTPStatus.OK, insert_response.json()
+        )
+        insert_parents = insert_response.json()["aliased_data"]["datatypes_n"]
+        self.assertEqual(len(insert_parents), 1)
+        self.assertEqual(
+            _nv(insert_parents[0]["aliased_data"]["non_localized_string_alias_n"]),
+            "initial-n-1-parent",
+        )
+        insert_child = insert_parents[0]["aliased_data"]["datatypes_n_1_child"]
+        self.assertEqual(
+            _nv(insert_child["aliased_data"]["non_localized_string_alias_n_1_child"]),
+            "initial-n-1-child",
+            "Card-1 child must be fresh in resource PUT insert response (n→1)",
+        )
+
+        # Second PUT: update; response must reflect the new value, not the stale one.
+        update_response = self.client.put(
+            update_url,
+            {
+                "aliased_data": {
+                    "datatypes_n": [
+                        {
+                            "tileid": str(parent_tile.pk),
+                            "resourceinstance": str(self.resource_42.pk),
+                            "aliased_data": {
+                                "non_localized_string_alias_n": "put-n-1-parent",
+                                "datatypes_n_1_child": {
+                                    "tileid": str(child_tile.pk),
+                                    "resourceinstance": str(self.resource_42.pk),
+                                    "aliased_data": {
+                                        "non_localized_string_alias_n_1_child": "put-n-1-child"
+                                    },
+                                },
+                            },
+                        }
+                    ],
+                },
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(
+            update_response.status_code, HTTPStatus.OK, update_response.json()
+        )
+        update_parents = update_response.json()["aliased_data"]["datatypes_n"]
+        self.assertEqual(len(update_parents), 1)
+        self.assertEqual(
+            _nv(update_parents[0]["aliased_data"]["non_localized_string_alias_n"]),
+            "put-n-1-parent",
+        )
+        update_child = update_parents[0]["aliased_data"]["datatypes_n_1_child"]
+        self.assertEqual(
+            _nv(update_child["aliased_data"]["non_localized_string_alias_n_1_child"]),
+            "put-n-1-child",
+            "Card-1 child must be fresh in resource PUT update response (n→1)",
+        )
+
     @unittest.skipIf(arches_version < Version("8.0"), reason="Arches 8+ only logic")
     def test_out_of_date_resource(self):
         Graph.objects.get(pk=self.graph.pk).publish(user=None)
