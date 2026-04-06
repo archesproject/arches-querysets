@@ -76,9 +76,6 @@ class AliasedDataMixin:
     """Don't implement properties: https://github.com/archesproject/arches/issues/12310"""
 
     def _refresh_aliased_data(self, using, fields, from_queryset):
-        import time as _time
-
-        _t0 = _time.perf_counter()
         try:
             del self._tile_trees
         except AttributeError:
@@ -93,30 +90,18 @@ class AliasedDataMixin:
             # it populates the cache. TODO: ask on forum about happier path.
             from_queryset.filter = lambda pk=None: from_queryset
             models.Model.refresh_from_db(self, using, fields, from_queryset)
-            _t1 = _time.perf_counter()
-            logger.warning(
-                "[TIMING] _refresh_aliased_data / Model.refresh_from_db: %.3fs",
-                _t1 - _t0,
-            )
             # Retrieve aliased data from the queryset cache.
             self.aliased_data = from_queryset[0].aliased_data
             self._tile_trees = from_queryset[0]._tile_trees
         else:
             # Django 4: good-enough riff on refresh_from_db(), but not bulletproof.
             db_instance = from_queryset.get()
-            _t1 = _time.perf_counter()
-            logger.warning(
-                "[TIMING] _refresh_aliased_data / from_queryset.get(): %.3fs", _t1 - _t0
-            )
             for field in db_instance._meta.concrete_fields:
                 setattr(self, field.attname, getattr(db_instance, field.attname))
             self.aliased_data = db_instance.aliased_data
             if isinstance(self, TileModel) and self.parenttile_id:
                 self.parenttile = TileModel.objects.get(pk=self.parenttile_id)
             self._tile_trees = from_queryset[0]._tile_trees
-        logger.warning(
-            "[TIMING] _refresh_aliased_data TOTAL: %.3fs", _time.perf_counter() - _t0
-        )
 
 
 class ResourceTileTree(ResourceInstance, AliasedDataMixin):
@@ -297,10 +282,6 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
         self, *, request=None, index=True, partial=True, force_admin=False, **kwargs
     ):
         """Raises a compound ValidationError with any failing tile values."""
-        import time as _time
-
-        _t0 = _time.perf_counter()
-
         request = ensure_request(request, force_admin)
         operation = TileTreeOperation(
             entry=self, request=request, partial=partial, save_kwargs=kwargs
@@ -314,10 +295,12 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
         operation.validate_and_save_tiles()
         if not self.pk:
             self.pk = operation.resourceid
-        _t1 = _time.perf_counter()
-        logger.warning(
-            "[TIMING] _save_aliased_data / validate_and_save_tiles: %.3fs", _t1 - _t0
+
+        # Capture changed tile PKs before references become stale.
+        changed_tile_pks = frozenset(
+            str(t.pk) for t in operation.to_insert | operation.to_update
         )
+        deleted_tile_pks = frozenset(str(t.pk) for t in operation.to_delete)
 
         # Capture changed tile PKs before references become stale.
         changed_tile_pks = frozenset(
@@ -332,10 +315,6 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
             .get()
         )
         proxy_resource.save_descriptors()
-        _t2 = _time.perf_counter()
-        logger.warning(
-            "[TIMING] _save_aliased_data / save_descriptors: %.3fs", _t2 - _t1
-        )
 
         if index:
             if (
@@ -343,21 +322,8 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
                 and task_management.check_if_celery_available()
             ):
                 index_resource.apply_async((self.resourceinstanceid,))
-                logger.warning(
-                    "[TIMING] _save_aliased_data / index (async, no wait): %.3fs",
-                    _time.perf_counter() - _t2,
-                )
             else:
                 proxy_resource.index()
-                _t3 = _time.perf_counter()
-                logger.warning(
-                    "[TIMING] _save_aliased_data / index (sync): %.3fs", _t3 - _t2
-                )
-        else:
-            logger.warning(
-                "[TIMING] _save_aliased_data / index: skipped (?index=false)"
-            )
-        _t3 = _time.perf_counter()
 
         # arches_version==9.0.0
         if arches_version < Version("8.0") and request and for_new_resource:
@@ -389,13 +355,6 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
             self.refresh_from_db(
                 using=kwargs.get("using"), fields=kwargs.get("update_fields")
             )
-        _t4 = _time.perf_counter()
-        logger.warning(
-            "[TIMING] _save_aliased_data / %s: %.3fs",
-            "targeted_refresh" if use_targeted_refresh else "refresh_from_db",
-            _t4 - _t3,
-        )
-        logger.warning("[TIMING] _save_aliased_data TOTAL: %.3fs", _t4 - _t0)
 
         if request.GET.get("fill_blanks", "f").lower().startswith("t"):
             self.fill_blanks()
@@ -416,10 +375,7 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
         This reduces the post-save work from O(all tiles) to O(changed tiles),
         which is a major win when editing a single tile in a large resource.
         """
-        import time as _time
         from arches_querysets.querysets import reprocess_tiles_aliased_data
-
-        _t0 = _time.perf_counter()
 
         # Step 1: Refresh the resource's own scalar fields cheaply (1 DB query).
         # We use ResourceInstance directly (bypassing our overridden refresh_from_db)
@@ -433,10 +389,6 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
         self.descriptors = fresh_row["descriptors"]
         if cached_graph is not None:
             self.graph = cached_graph  # restore the expensive prefetched graph
-        _t1 = _time.perf_counter()
-        logger.warning(
-            "[TIMING] _targeted_refresh / refresh descriptors: %.3fs", _t1 - _t0
-        )
 
         # Step 2: Build lookup: parent_pk (str or None) -> list of inserted tiles.
         inserted_tiles = list(operation.to_insert)
@@ -461,7 +413,12 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
                     continue
                 tile._tile_trees = walk_and_patch(getattr(tile, "_tile_trees", []))
                 if pk_str in inserted_by_parent:
-                    tile._tile_trees.extend(inserted_by_parent[pk_str])
+                    existing_child_pks = {str(t.pk) for t in tile._tile_trees}
+                    tile._tile_trees.extend(
+                        t
+                        for t in inserted_by_parent[pk_str]
+                        if str(t.pk) not in existing_child_pks
+                    )
                 result.append(tile)
             return result
 
@@ -490,8 +447,6 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
                 parent = inserted_by_pk[str(tile.parenttile_id)]
                 parent._tile_trees = [*getattr(parent, "_tile_trees", []), tile]
 
-        _t2 = _time.perf_counter()
-
         # Step 4: Re-process aliased_data for tiles that actually changed.
         # Updated tiles: already in the tree with `.data` updated in-place.
         # Inserted tiles: new instances that need initial aliased_data processing.
@@ -508,9 +463,19 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
                 if parent is not None:
                     parent_tiles_to_reprocess.add(parent)
 
-        tiles_to_reprocess = (
+        # Deduplicate tiles_to_reprocess by object identity, preserving order.
+        # A tile may appear in both to_update and parent_tiles_to_reprocess
+        # (e.g. the parent of a newly inserted child was also updated in the same
+        # save).  Processing it twice would append its children to aliased_data
+        # twice, producing duplicate entries.
+        _seen_ids: set[int] = set()
+        tiles_to_reprocess = []
+        for _t in (
             list(operation.to_update) + inserted_tiles + list(parent_tiles_to_reprocess)
-        )
+        ):
+            if id(_t) not in _seen_ids:
+                _seen_ids.add(id(_t))
+                tiles_to_reprocess.append(_t)
         if tiles_to_reprocess:
             graph = cached_graph or self.graph
             grouping_node_lookup = {
@@ -524,24 +489,12 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
                 as_representation=getattr(self, "_as_representation", False),
                 grouping_node_lookup=grouping_node_lookup,
             )
-        _t3 = _time.perf_counter()
-        logger.warning(
-            "[TIMING] _targeted_refresh / reprocess %d tile(s): %.3fs",
-            len(tiles_to_reprocess),
-            _t3 - _t2,
-        )
 
         # Step 5: Rebuild the resource's top-level aliased_data from the updated tree.
         self.aliased_data = AliasedData()
         self._rebuild_resource_aliased_data(
             grouping_node_lookup=grouping_node_lookup if tiles_to_reprocess else None
         )
-        _t4 = _time.perf_counter()
-        logger.warning(
-            "[TIMING] _targeted_refresh / rebuild resource aliased_data: %.3fs",
-            _t4 - _t3,
-        )
-        logger.warning("[TIMING] _targeted_refresh TOTAL: %.3fs", _t4 - _t0)
 
     def _rebuild_resource_aliased_data(self, *, grouping_node_lookup=None):
         """Rebuild self.aliased_data from the current self._tile_trees.

@@ -1,5 +1,4 @@
 import logging
-import time
 from functools import partial
 from itertools import chain
 
@@ -138,12 +137,8 @@ class ArchesModelAPIMixin:
         )
 
     def get_object(self, permission_callable=None, fill_blanks=False):
-        _t_go0 = time.perf_counter()
         ret = super().get_object()
-        logger.warning(
-            "[TIMING] get_object / super().get_object(): %.3fs",
-            time.perf_counter() - _t_go0,
-        )
+
         if isinstance(ret, TileTree):
             self.graph_nodes = ret.resourceinstance.graph.node_set.all()
         else:
@@ -247,34 +242,21 @@ class ArchesModelAPIMixin:
             fill_blanks=self.fill_blanks,
         )
 
-        # ── TIMING ──────────────────────────────────────────────────────────
-        _t0 = time.perf_counter()
         is_partial = kwargs.pop("partial", False)
         instance = self.get_object()
-        _t1 = time.perf_counter()
-        logger.warning("[TIMING] get_object: %.3fs", _t1 - _t0)
 
         serializer = self.get_serializer(
             instance, data=request.data, partial=is_partial
         )
-        _t2 = time.perf_counter()
         serializer.is_valid(raise_exception=True)
-        _t3 = time.perf_counter()
-        logger.warning("[TIMING] serializer.is_valid(): %.3fs", _t3 - _t2)
 
         self.perform_update(serializer)
-        _t4 = time.perf_counter()
-        logger.warning("[TIMING] perform_update (save): %.3fs", _t4 - _t3)
 
         if getattr(instance, "_prefetched_objects_cache", None):
             instance._prefetched_objects_cache = {}
 
         response = Response(serializer.data)
-        _t5 = time.perf_counter()
-        logger.warning("[TIMING] Response(serializer.data): %.3fs", _t5 - _t4)
-        logger.warning("[TIMING] update() TOTAL: %.3fs", _t5 - _t0)
         return response
-        # ────────────────────────────────────────────────────────────────────
 
     def destroy(self, request, *args, **kwargs):
         self.get_object = partial(
@@ -298,7 +280,7 @@ class ArchesModelAPIMixin:
         Discussion:
         https://github.com/encode/django-rest-framework/discussions/7850
         """
-        _t_save0 = time.perf_counter()
+
         try:
             serializer.save()
         except DjangoValidationError as django_error:
@@ -308,10 +290,6 @@ class ArchesModelAPIMixin:
             else:
                 errors = {api_settings.NON_FIELD_ERRORS_KEY: flattened_errors}
             raise ValidationError(errors) from django_error
-        logger.warning(
-            "[TIMING] validate_tile_data_and_save / serializer.save(): %.3fs",
-            time.perf_counter() - _t_save0,
-        )
 
     def perform_create(self, serializer):
         self.validate_tile_data_and_save(serializer)

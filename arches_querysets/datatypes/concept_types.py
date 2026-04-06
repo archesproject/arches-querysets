@@ -18,9 +18,6 @@ class ConceptDataType(concept_types.ConceptDataType):
         return self.get_instance(value)
 
     def to_json(self, tile, node):
-        import logging as _logging
-
-        _log = _logging.getLogger(__name__)
         data = self.get_tile_data(tile)
         if not data:
             return None
@@ -38,20 +35,13 @@ class ConceptDataType(concept_types.ConceptDataType):
         # across requests.  Concept values rarely change, making this safe.
         if not hasattr(self, "_serialized_value_cache"):
             self._serialized_value_cache = {}
-        cache_miss = key not in self._serialized_value_cache
-        if cache_miss:
+        if key not in self._serialized_value_cache:
             value_obj = self.get_value(key)
             self._serialized_value_cache[key] = (
                 JSONSerializer().serializeToPython(value_obj)
                 if value_obj is not None
                 else {}
             )
-        _log.warning(
-            "[CONCEPT to_json] cache_%s key=%s cache_size=%d",
-            "MISS" if cache_miss else "HIT",
-            key,
-            len(self._serialized_value_cache),
-        )
         return self.compile_json(tile, node, **self._serialized_value_cache[key])
 
     def get_details(self, value, **kwargs):

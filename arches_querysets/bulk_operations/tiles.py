@@ -134,24 +134,11 @@ class TileTreeOperation:
             return ret
 
     def validate_and_save_tiles(self):
-        import time as _time
-
-        _t0 = _time.perf_counter()
-
         delete_missing_tiles = (
             self.request.GET.get("delete_missing_tiles", str(not self.partial)).lower()
             == "true"
         )
         self.validate(delete_missing_tiles=delete_missing_tiles)
-        _t1 = _time.perf_counter()
-        logger.warning(
-            "[TIMING] validate_and_save_tiles / validate(): %.3fs  "
-            "(to_insert=%d, to_update=%d, to_delete=%d)",
-            _t1 - _t0,
-            len(self.to_insert),
-            len(self.to_update),
-            len(self.to_delete),
-        )
 
         try:
             self._save()
@@ -163,15 +150,8 @@ class TileTreeOperation:
                 msg = _("Tile Cardinality Error")
                 raise ValidationError({nodegroup_alias: msg}) from e
             raise
-        _t2 = _time.perf_counter()
-        logger.warning("[TIMING] validate_and_save_tiles / _save(): %.3fs", _t2 - _t1)
 
         self.after_update_all()
-        _t3 = _time.perf_counter()
-        logger.warning(
-            "[TIMING] validate_and_save_tiles / after_update_all(): %.3fs", _t3 - _t2
-        )
-        logger.warning("[TIMING] validate_and_save_tiles TOTAL: %.3fs", _t3 - _t0)
 
     def validate(self, delete_missing_tiles=False):
         """Move values from resource or tile to prefetched tiles, and validate.
@@ -551,7 +531,6 @@ class TileTreeOperation:
             raise
 
     def _perform_transaction(self):
-        import time as _time
         from arches_querysets.models import ResourceTileTree
 
         # Instantiate proxy models for now, but TODO: expose this
@@ -572,15 +551,7 @@ class TileTreeOperation:
         delete_proxies = Tile.objects.filter(
             pk__in=[tile.pk for tile in self.to_delete]
         )
-        logger.warning(
-            "[TIMING] _perform_transaction: upserts=%d (insert=%d update=%d) delete=%d",
-            len(upserts),
-            len(self.to_insert),
-            len(self.to_update),
-            len(self.to_delete),
-        )
 
-        _t0 = _time.perf_counter()
         with transaction.atomic(durable=True):
             if not self.for_new_resource:
                 if isinstance(self.entry, ResourceTileTree):
@@ -629,10 +600,6 @@ class TileTreeOperation:
                     provisional_edit_log_details
                 )
                 upsert_proxy._existing_data = vanilla_instance.data
-            _t1 = _time.perf_counter()
-            logger.warning(
-                "[TIMING] _perform_transaction / preSave loop: %.3fs", _t1 - _t0
-            )
 
             for delete_proxy in delete_proxies:
                 delete_proxy._Tile__preDelete(request=self.request)
@@ -663,10 +630,6 @@ class TileTreeOperation:
                 )
             if self.to_delete:
                 TileModel.objects.filter(pk__in=[t.pk for t in self.to_delete]).delete()
-            _t2 = _time.perf_counter()
-            logger.warning(
-                "[TIMING] _perform_transaction / bulk DB ops: %.3fs", _t2 - _t1
-            )
 
             for upsert_tile in upserts:
                 grouping_node = self.grouping_nodes_by_nodegroup_id[
@@ -677,17 +640,9 @@ class TileTreeOperation:
                     datatype.post_tile_save(
                         upsert_tile, str(node.pk), request=self.request
                     )
-            _t3 = _time.perf_counter()
-            logger.warning(
-                "[TIMING] _perform_transaction / post_tile_save loop: %.3fs", _t3 - _t2
-            )
 
             for upsert_proxy in upsert_proxies:
                 upsert_proxy._Tile__postSave()
-            _t4 = _time.perf_counter()
-            logger.warning(
-                "[TIMING] _perform_transaction / __postSave loop: %.3fs", _t4 - _t3
-            )
 
             # Save edits: could be done in bulk once above side effects are un-proxied.
             for insert_proxy in insert_proxies:
@@ -721,11 +676,6 @@ class TileTreeOperation:
                     provisional_edit_log_details=None,
                     transaction_id=self.transaction_id,
                 )
-            _t5 = _time.perf_counter()
-            logger.warning(
-                "[TIMING] _perform_transaction / edit log saves: %.3fs", _t5 - _t4
-            )
-            logger.warning("[TIMING] _perform_transaction TOTAL: %.3fs", _t5 - _t0)
 
     def after_update_all(self):
         for datatype in self.datatype_factory.datatype_instances.values():

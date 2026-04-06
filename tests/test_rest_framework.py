@@ -229,6 +229,65 @@ class RestFrameworkTests(GraphTestCase):
             },
         )
 
+    def test_update_tile_with_child(self):
+        """PATCH a cardinality-n parent tile + child simultaneously; child value must be
+        fresh in the response (regression test for stale child aliased_data after save).
+        """
+        parent_tile = self.resource_42.aliased_data.datatypes_n[0]
+        child_tile = parent_tile.aliased_data.datatypes_n_child[0]
+
+        update_url = reverse(
+            "arches_querysets:api-tile",
+            kwargs={
+                "graph": "datatype_lookups",
+                "nodegroup_alias": "datatypes_n",
+                "pk": parent_tile.pk,
+            },
+        )
+        request_body = {
+            "resourceinstance": str(self.resource_42.pk),
+            "aliased_data": {
+                "non_localized_string_alias_n": "updated-parent-value",
+                "datatypes_n_child": [
+                    {
+                        "tileid": str(child_tile.pk),
+                        "resourceinstance": str(self.resource_42.pk),
+                        "aliased_data": {
+                            "non_localized_string_alias_n_child": "updated-child-value",
+                        },
+                    }
+                ],
+            },
+        }
+
+        self.client.login(username="dev", password="dev")
+        response = self.client.patch(
+            update_url, request_body, content_type="application/json"
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK, response.json())
+
+        def _node_value(v):
+            return v["node_value"] if isinstance(v, dict) else v
+
+        # Parent value must be updated.
+        self.assertEqual(
+            _node_value(
+                response.json()["aliased_data"]["non_localized_string_alias_n"]
+            ),
+            "updated-parent-value",
+        )
+
+        # Child value must reflect the *just-saved* value, not the pre-save value.
+        child_response = response.json()["aliased_data"]["datatypes_n_child"][0]
+        child_non_loc_str = child_response["aliased_data"][
+            "non_localized_string_alias_n_child"
+        ]
+        self.assertEqual(
+            _node_value(child_non_loc_str),
+            "updated-child-value",
+            "Child tile aliased_data must be refreshed after save, not stale",
+        )
+
     @unittest.skipIf(arches_version < Version("8.0"), reason="Arches 8+ only logic")
     def test_out_of_date_resource(self):
         Graph.objects.get(pk=self.graph.pk).publish(user=None)
@@ -504,8 +563,8 @@ class RestFrameworkPerformanceTests(GraphTestCase):
         # 21: tile depth 2
         # 22: resourcexresource depth 2
         # 23: tile depth 3: none!
-        # 24-28: arches perms (BUG: core arches)
-        num_queries = 28
+        # 24-26: arches perms (BUG: core arches)
+        num_queries = 26
         if arches_version < Version("8.1.0a0"):
             num_queries += 1  # extra user profile query on Arches 8.0 and below.
         with self.assertNumQueries(num_queries):
@@ -534,8 +593,8 @@ class RestFrameworkPerformanceTests(GraphTestCase):
         # 20: tile depth 2
         # 21: resourcexresource depth 2
         # 22: tile depth 3: none!
-        # 23-27: arches perms (BUG: core arches)
-        num_queries = 27
+        # 23-25: arches perms (BUG: core arches)
+        num_queries = 25
         if arches_version < Version("8.1.0a0"):
             num_queries += 1  # extra user profile query on Arches 8.0 and below.
         with self.assertNumQueries(num_queries):

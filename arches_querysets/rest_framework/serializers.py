@@ -773,11 +773,6 @@ class ArchesResourceSerializer(serializers.ModelSerializer, NodeFetcherMixin):
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        import time as _time
-        import logging as _logging
-
-        _log = _logging.getLogger(__name__)
-        _tu0 = _time.perf_counter()
         request = self.context.get("request")
 
         aliased_data = validated_data.pop("aliased_data", None)
@@ -787,16 +782,8 @@ class ArchesResourceSerializer(serializers.ModelSerializer, NodeFetcherMixin):
 
         if aliased_data is not None:
             instance.aliased_data = aliased_data
-        _tu1 = _time.perf_counter()
 
         instance.save(request=request)
-        _tu2 = _time.perf_counter()
-
-        _log.warning(
-            "[TIMING] serializer.update: pre_save=%.3fs save=%.3fs",
-            _tu1 - _tu0,
-            _tu2 - _tu1,
-        )
         return instance
 
     def get_graph_has_different_publication(self, obj):

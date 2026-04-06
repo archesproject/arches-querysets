@@ -1,5 +1,4 @@
 import logging
-import time as _time
 import uuid
 from collections import defaultdict
 from slugify import slugify
@@ -314,7 +313,6 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
         """
         from arches_querysets.models import AliasedData
 
-        _t0 = _time.perf_counter()
         aliased_data_to_update = {}
         values_by_datatype = defaultdict(list)
         datatype_contexts = {}
@@ -337,56 +335,20 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
                 aliased_data_to_update[(tile, node)] = node_value
                 values_by_datatype[node.datatype].append(node_value)
 
-        _t1 = _time.perf_counter()
-        logger.warning(
-            "[TIMING] TileTreeQS._set_aliased_data / build values_by_datatype"
-            " (%d tiles, %d datatypes): %.3fs",
-            len(self._result_cache),
-            len(values_by_datatype),
-            _t1 - _t0,
-        )
-
         # Get datatype context querysets.
         for datatype, values in values_by_datatype.items():
-            _td0 = _time.perf_counter()
             datatype_instance = DataTypeFactory().get_instance(datatype)
             bulk_values = datatype_instance.get_display_value_context_in_bulk(values)
             datatype_instance.set_display_value_context_in_bulk(bulk_values)
             datatype_contexts[datatype] = bulk_values
-            logger.warning(
-                "[TIMING] TileTreeQS._set_aliased_data / context '%s' (%d values): %.3fs",
-                datatype,
-                len(values),
-                _time.perf_counter() - _td0,
-            )
-
-        _t2 = _time.perf_counter()
 
         # Set aliased_data property.
-        _dt_times = defaultdict(float)
         for tile_node_pair, node_value in aliased_data_to_update.items():
             tile, node = tile_node_pair
-            _td = _time.perf_counter()
             tile.set_aliased_data(node, node_value, datatype_contexts)
-            _dt_times[node.datatype] += _time.perf_counter() - _td
-
-        _t3 = _time.perf_counter()
-        logger.warning(
-            "[TIMING] TileTreeQS._set_aliased_data / set_aliased_data loop: %.3fs"
-            "  breakdown: %s",
-            _t3 - _t2,
-            {k: f"{v:.3f}s" for k, v in sorted(_dt_times.items(), key=lambda x: -x[1])},
-        )
 
         for tile in self._result_cache:
             self._set_child_tile_data(tile)
-
-        logger.warning(
-            "[TIMING] TileTreeQS._set_aliased_data / _set_child_tile_data loop: %.3fs"
-            " | TOTAL: %.3fs",
-            _time.perf_counter() - _t3,
-            _time.perf_counter() - _t0,
-        )
 
     def _set_child_tile_data(self, tile):
         child_tiles = getattr(tile, "_tile_trees", [])
