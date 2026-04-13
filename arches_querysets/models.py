@@ -404,22 +404,12 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
         # Step 3: Walk the existing tile tree recursively.
         # - Remove deleted tiles.
         # - Attach any newly inserted child tiles to their parents.
-        # - Replace any nested-prefetch duplicate objects with the canonical flat-list
-        #   object (all_existing_by_pk, built below).  resource._tile_trees is a flat
-        #   list of ALL tiles; parent._tile_trees comes from a *separate* nested
-        #   prefetch and holds different Python objects for the same DB rows.
-        #   TileTreeOperation updates .data in-place on the flat-list objects only, so
-        #   we must use those objects throughout the hierarchy for the reprocessing
-        #   step to see the new data.
         def walk_and_patch(tile_list):
             result = []
             for tile in tile_list:
                 pk_str = str(tile.pk)
                 if pk_str in deleted_tile_pks:
                     continue
-                # Use the canonical flat-list object (which has .data updated in-place
-                # by TileTreeOperation) instead of any nested-prefetch duplicate.
-                tile = all_existing_by_pk.get(pk_str, tile)
                 tile._tile_trees = walk_and_patch(getattr(tile, "_tile_trees", []))
                 if pk_str in inserted_by_parent:
                     existing_child_pks = {str(t.pk) for t in tile._tile_trees}
@@ -431,21 +421,13 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
                 result.append(tile)
             return result
 
-        # Build a flat pk→tile lookup of all tiles in the pre-save tree so we
-        # can find parents of inserted/deleted tiles in O(1).
-        #
-        # Seed from operation.to_update first: those objects have .data already
-        # updated in-place by TileTreeOperation.  The pre-save tree may also
-        # contain nested-prefetch duplicates of the same DB rows (separate Python
-        # objects) with stale .data; they must NOT overwrite the canonical updated
-        # objects.
-        all_existing_by_pk = {str(t.pk): t for t in operation.to_update}
+        # Build a pk→tile lookup of all tiles in the pre-save tree so we
+        # can find parents of inserted/deleted/updated tiles in O(1).
+        all_existing_by_pk = {}
 
         def collect_tiles(tile_list):
             for tile in tile_list:
-                pk_str = str(tile.pk)
-                if pk_str not in all_existing_by_pk:
-                    all_existing_by_pk[pk_str] = tile
+                all_existing_by_pk[str(tile.pk)] = tile
                 collect_tiles(getattr(tile, "_tile_trees", []))
 
         collect_tiles(pre_save_tile_trees)
@@ -545,8 +527,6 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
 
         # Attach top-level tiles under their nodegroup alias.
         for tile in getattr(self, "_tile_trees", []):
-            if tile.nodegroup.parentnodegroup_id:
-                continue
             nodegroup_alias = grouping_nodes[tile.nodegroup_id].alias
             if tile.nodegroup.cardinality == "n":
                 tile_array = getattr(self.aliased_data, nodegroup_alias)

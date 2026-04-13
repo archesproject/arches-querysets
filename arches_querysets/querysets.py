@@ -517,7 +517,7 @@ class ResourceTileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
                         nodes=nodes,
                         graph_query=graph_query,
                         depth=depth,
-                    ),
+                    ).filter(parenttile=None),
                     to_attr="_tile_trees",
                 ),
             )
@@ -590,8 +590,6 @@ class ResourceTileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
 
             # Fill aliased data with top nodegroup data.
             for tile in getattr(resource, "_tile_trees", []):
-                if tile.nodegroup.parentnodegroup_id:
-                    continue
                 nodegroup_alias = grouping_nodes[tile.nodegroup_id].alias
                 if tile.nodegroup.cardinality == "n":
                     tile_array = getattr(resource.aliased_data, nodegroup_alias)
