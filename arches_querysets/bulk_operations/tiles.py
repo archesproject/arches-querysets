@@ -89,7 +89,13 @@ class TileTreeOperation:
         else:
             self.resourceid = self.entry.pk
             self.nodegroups = []  # not necessary to populate.
-            existing_tiles = getattr(self.entry, "_tile_trees", [])
+
+            def _collect_all(tile_list):
+                for tile in tile_list:
+                    yield tile
+                    yield from _collect_all(getattr(tile, "_tile_trees", []))
+
+            existing_tiles = list(_collect_all(getattr(self.entry, "_tile_trees", [])))
 
         self.for_new_resource = self.resourceid is None
         if self.for_new_resource:

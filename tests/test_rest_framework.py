@@ -292,12 +292,11 @@ class RestFrameworkTests(GraphTestCase):
         """PUT to ArchesResourceDetailView updating a cardinality-n parent + child
         simultaneously; child value must be fresh in the response.
 
-        Regression test for the dual-object problem in _targeted_refresh_aliased_data:
-        resource._tile_trees (flat list) and parent._tile_trees (nested prefetch) hold
-        separate Python objects for the same DB rows.  TileTreeOperation updates .data
-        in-place on the flat-list objects only; walk_and_patch must use those canonical
-        objects when rebuilding the hierarchy so reprocess_tiles_aliased_data sees the
-        new data.
+        Regression test for stale aliased_data in _targeted_refresh_aliased_data:
+        resource._tile_trees holds only top-level tiles; children live in the nested
+        parent._tile_trees.  TileTreeOperation updates .data in-place on the same
+        Python objects that live in the hierarchy, so reprocess_tiles_aliased_data
+        must see the updated data when rebuilding parent aliased_data.
         """
         parent_tile = self.resource_42.aliased_data.datatypes_n[0]
         child_tile = parent_tile.aliased_data.datatypes_n_child[0]
