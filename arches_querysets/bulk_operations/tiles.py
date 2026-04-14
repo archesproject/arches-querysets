@@ -303,24 +303,22 @@ class TileTreeOperation:
 
             # Fast path: skip expensive datatype validation for existing tiles
             # whose incoming data is provably identical to what's already stored.
-            # tile.data stays unmodified, so _tile_update_is_noop() will always
-            # remove it from to_update in the loop below.
-            if tile in to_update:
-                original = original_tile_by_tile_id.get(tile.pk)
-                if original and self._is_incoming_data_unchanged(
-                    tile, original, non_semantic_nodes
-                ):
-                    continue
+            original = (
+                original_tile_by_tile_id.get(tile.pk) if tile in to_update else None
+            )
+
+            if original and self._is_incoming_data_unchanged(
+                tile, original, non_semantic_nodes
+            ):
+                to_update.remove(tile)
+                continue
 
             self._validate_and_patch_incoming_values(tile, nodes=nodes)
 
             tile.set_missing_keys_to_none()
 
-        for tile in list(to_update):
-            # Remove no-op upserts.
-            if (
-                original_tile := original_tile_by_tile_id.pop(tile.pk, None)
-            ) and tile._tile_update_is_noop(original_tile):
+            # Remove no-op upserts (validation may normalize values to match existing).
+            if original and tile._tile_update_is_noop(original):
                 to_update.remove(tile)
 
         self.to_insert |= to_insert
