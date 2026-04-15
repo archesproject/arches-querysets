@@ -1,6 +1,6 @@
 import copy
 from uuid import uuid4
-from arches.app.models.models import TileModel
+from arches.app.models.models import EditLog, TileModel
 from django.core.exceptions import ValidationError
 
 from arches_querysets.models import ResourceTileTree, TileTree
@@ -169,4 +169,51 @@ class SaveTileTests(GraphTestCase):
             ),
             1,
             "Confirm child tile still exists after deletion of sibling tile",
+        )
+
+    def test_tile_edit_log_records_correct_old_and_new_values(self):
+        """Edit log old_value must reflect pre-update DB state, not the incoming data.
+
+        Regression: _existing_data was overwritten with vanilla_instance.data
+        (the new data) in _perform_transaction after the field sync, causing
+        old_value == new_value in the edit log.
+        """
+        node_id_str = str(self.non_localized_string_node_1.pk)
+
+        # Capture the value currently stored in the DB before any update.
+        tile_before = TileModel.objects.get(pk=self.cardinality_1_tile.pk)
+        old_stored_value = tile_before.data[node_id_str]  # "forty-two"
+
+        new_value = "fifty-two"
+        self.assertNotEqual(old_stored_value, new_value)
+
+        # Clear any edit log entries written during setUpTestData so we can
+        # use .get() unambiguously after the save.
+        EditLog.objects.filter(tileinstanceid=str(self.cardinality_1_tile.pk)).delete()
+
+        # Fetch via TileTree and update the non-localized-string value.
+        tile = TileTree.get_tiles("datatype_lookups", "datatypes_1").get(
+            pk=self.cardinality_1_tile.pk
+        )
+        tile.aliased_data.non_localized_string_alias = new_value
+        tile.save(force_admin=True)
+
+        log_entry = EditLog.objects.get(
+            tileinstanceid=str(self.cardinality_1_tile.pk),
+            edittype="tile edit",
+        )
+        self.assertEqual(
+            log_entry.oldvalue[node_id_str],
+            old_stored_value,
+            "old_value in edit log should reflect the pre-update DB value",
+        )
+        self.assertEqual(
+            log_entry.newvalue[node_id_str],
+            new_value,
+            "new_value in edit log should reflect the updated value",
+        )
+        self.assertNotEqual(
+            log_entry.oldvalue,
+            log_entry.newvalue,
+            "old_value and new_value must differ in the edit log",
         )
