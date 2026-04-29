@@ -504,9 +504,11 @@ class RestFrameworkPerformanceTests(GraphTestCase):
         # 21: tile depth 2
         # 22: resourcexresource depth 2
         # 23: tile depth 3: none!
-        # 24: userprofile
-        # 25-29: arches perms (BUG: core arches)
-        with self.assertNumQueries(29):
+        # 24-28: arches perms (BUG: core arches)
+        num_queries = 28
+        if arches_version < Version("8.1.0a0"):
+            num_queries += 1  # extra user profile query on Arches 8.0 and below.
+        with self.assertNumQueries(num_queries):
             response = self.client.get(
                 reverse(
                     "arches_querysets:api-resources",
@@ -532,9 +534,11 @@ class RestFrameworkPerformanceTests(GraphTestCase):
         # 20: tile depth 2
         # 21: resourcexresource depth 2
         # 22: tile depth 3: none!
-        # 23: userprofile
-        # 24-28: arches perms (BUG: core arches)
-        with self.assertNumQueries(28):
+        # 23-27: arches perms (BUG: core arches)
+        num_queries = 27
+        if arches_version < Version("8.1.0a0"):
+            num_queries += 1  # extra user profile query on Arches 8.0 and below.
+        with self.assertNumQueries(num_queries):
             response = self.client.get(
                 reverse(
                     "arches_querysets:api-tiles",
@@ -553,10 +557,13 @@ class RestFrameworkPerformanceTests(GraphTestCase):
         self.assertIsNone(top_tile["aliased_data"]["number_alias"]["node_value"])
 
     def test_resource_blank_view_performance(self):
-        # 1-7: perms
-        # 8: get_nodegroup_alias_lookup()
-        # 9-12: NodeFetcherMixin._find_graph_nodes()
-        with self.assertNumQueries(12):
+        # 1-5: perms
+        # 6: get_nodegroup_alias_lookup()
+        # 7-11: NodeFetcherMixin._find_graph_nodes()
+        num_queries = 11
+        if arches_version < Version("8.1.0a0"):
+            num_queries += 1  # extra user profile query on Arches 8.0 and below.
+        with self.assertNumQueries(num_queries):
             response = self.client.get(
                 reverse(
                     "arches_querysets:api-resource-blank",
