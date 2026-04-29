@@ -477,10 +477,10 @@ class TileTreeOperation:
         Interact with the database in bulk as much as possible.
         Since some side effects are only exposed on (Proxy)Tile.save(), but
         we wish to operate on TileTrees, which only inherit from (vanilla)
-        TileModel, we will need to pair off Tile and TileModel instances.
+        TileModel, we will need to pair off Tile and TileTree instances.
 
         Below,
-        vanilla_instance: the TileModel instance to save
+        vanilla_instance: the TileTree instance to save
         insert/update_proxy: the Tile instance to run side effects on.
 
         This situation is a snapshot of an "arrested" refactor that was slowed
