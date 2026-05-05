@@ -231,29 +231,13 @@ class ArchesModelAPIMixin:
         return super().retrieve(request, *args, **kwargs)
 
     def update(self, request, *args, **kwargs):
-        from rest_framework.response import Response
-
         self.get_object = partial(
             self.get_object,
             permission_callable=user_can_edit_resource,
             fill_blanks=self.fill_blanks,
         )
 
-        is_partial = kwargs.pop("partial", False)
-        instance = self.get_object()
-
-        serializer = self.get_serializer(
-            instance, data=request.data, partial=is_partial
-        )
-        serializer.is_valid(raise_exception=True)
-
-        self.perform_update(serializer)
-
-        if getattr(instance, "_prefetched_objects_cache", None):
-            instance._prefetched_objects_cache = {}
-
-        response = Response(serializer.data)
-        return response
+        return super().update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
         self.get_object = partial(
