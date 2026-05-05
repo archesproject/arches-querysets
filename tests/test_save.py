@@ -1,7 +1,10 @@
 import copy
 from uuid import uuid4
 from arches.app.models.models import EditLog, TileModel
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.core.management import call_command
+from django.http.request import HttpRequest
 
 from arches_querysets.models import ResourceTileTree, TileTree
 from arches_querysets.utils.models import ensure_request
@@ -12,6 +15,7 @@ class SaveTileTests(GraphTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
+        call_command("add_test_users", verbosity=0)
         resources = ResourceTileTree.get_tiles(
             "datatype_lookups", as_representation=True
         )
@@ -62,6 +66,17 @@ class SaveTileTests(GraphTestCase):
         # Save should stock defaults
         self.resource_42.aliased_data.datatypes_1.save(force_admin=True)
         self.assert_default_values_present(self.resource_42)
+
+    def test_save_new_tile_provisional(self):
+        tile = self.resource_none.aliased_data.datatypes_1
+        tile.delete()
+        tile.pk = uuid4()
+        provisional_editor = User.objects.get(username="tester3")
+        request = HttpRequest()
+        request.user = provisional_editor
+        tile.save(request=request)
+        edit_log = EditLog.objects.get(tileinstanceid=tile.pk)
+        self.assertEqual(edit_log.newvalue, {})
 
     def test_fill_blanks(self):
         self.resource_none.tilemodel_set.all().delete()
