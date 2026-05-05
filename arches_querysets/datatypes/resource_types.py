@@ -107,9 +107,6 @@ class ResourceInstanceDataType(datatypes.ResourceInstanceDataType):
         if not uncached_values:
             return related_resources
 
-        print(
-            f"Cache hit for {len(value) - len(uncached_values)} of {len(value)} related resources"
-        )
         logger.debug(
             "Falling back to per-resource queries for %s uncached related resources",
             len(uncached_values),
