@@ -259,13 +259,15 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
             # GraphWithPrefetching is defined later in this module; the name is
             # resolved at call time so the forward reference works fine.
             if isinstance(cached_graph, GraphWithPrefetching):
-                nodes = [
-                    node
-                    for node in cached_graph.node_set.all()
-                    if node.datatype != "semantic"
-                    and node.nodegroup_id is not None
-                    and not getattr(node, "source_identifier", None)
-                ]
+                filters = models.Q()
+                if arches_version >= Version("8.0"):
+                    filters &= models.Q(source_identifier=None)
+
+                nodes = (
+                    cached_graph.node_set.filter(filters)
+                    .exclude(datatype="semantic")
+                    .exclude(nodegroup=None)
+                )
                 graph_query = [cached_graph]
             else:
                 nodes = None
@@ -479,11 +481,15 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
                 tiles_to_reprocess.append(_t)
         if tiles_to_reprocess:
             graph = cached_graph or self.graph
+
+            filters = models.Q()
+            if arches_version >= Version("8.0"):
+                filters &= models.Q(source_identifier=None)
+
             grouping_node_lookup = {
                 node.pk: node
-                for node in graph.node_set.all()
+                for node in graph.node_set.filter(filters)
                 if node.pk == node.nodegroup_id
-                and not getattr(node, "source_identifier", None)
             }
             reprocess_tiles_aliased_data(
                 tiles_to_reprocess,
@@ -510,12 +516,14 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
         if grouping_node_lookup is not None:
             grouping_nodes = grouping_node_lookup
         else:
+            filters = models.Q()
+            if arches_version >= Version("8.0"):
+                filters &= models.Q(source_identifier=None)
+
             grouping_nodes = {
                 node.pk: node
-                for node in graph.node_set.all()
-                if node.nodegroup
-                and node.pk == node.nodegroup_id
-                and not getattr(node, "source_identifier", None)
+                for node in graph.node_set.filter(filters).exclude(nodegroup=None)
+                if node.pk == node.nodegroup_id
             }
 
         # Set default empty containers for top-level nodegroups.
