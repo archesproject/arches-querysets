@@ -304,12 +304,6 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
         )
         deleted_tile_pks = frozenset(str(t.pk) for t in operation.to_delete)
 
-        # Capture changed tile PKs before references become stale.
-        changed_tile_pks = frozenset(
-            str(t.pk) for t in operation.to_insert | operation.to_update
-        )
-        deleted_tile_pks = frozenset(str(t.pk) for t in operation.to_delete)
-
         # Run side effects trapped on Resource.save()
         proxy_resource = (
             Resource.objects.filter(pk=self.pk)
