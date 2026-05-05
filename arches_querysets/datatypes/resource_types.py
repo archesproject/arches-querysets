@@ -8,6 +8,8 @@ from packaging.version import Version
 arches_version = Version(_arches_version_str)
 from arches.app.datatypes import datatypes
 from arches.app.models import models
+
+from django.core.cache import caches
 from django.utils.translation import get_language
 from django.utils.translation import gettext as _
 
@@ -81,30 +83,37 @@ class ResourceInstanceDataType(datatypes.ResourceInstanceDataType):
         return models.ResourceInstance.objects.filter(pk__in=all_resource_ids)
 
     def set_display_value_context_in_bulk(self, datatype_context):
-        if not hasattr(self, "_resource_instance_cache"):
-            self._resource_instance_cache = {}
+        cache = caches["querysets_resource_instance_cache"]
         for resource_instance in datatype_context:
-            self._resource_instance_cache[resource_instance.pk] = resource_instance
+            cache.set(str(resource_instance.pk), resource_instance)
 
     def get_related_resources(self, value, resource):
         if not value:
             return []
         related_resources = []
 
-        cache = getattr(self, "_resource_instance_cache", None)
-        if cache is not None:
-            for inner_val in value:
-                if not inner_val:
-                    continue
-                target_resource_id = uuid.UUID(inner_val["resourceId"])
-                if target_resource_id in cache:
-                    related_resources.append(cache[target_resource_id])
-                else:
-                    logger.warning(
-                        "Missing ResourceXResource target: %s", target_resource_id
-                    )
+        cache = caches["querysets_resource_instance_cache"]
+        uncached_values = []
+        for inner_val in value:
+            if not inner_val:
+                continue
+            target_resource_id = uuid.UUID(inner_val["resourceId"])
+            cached_resource = cache.get(str(target_resource_id))
+            if cached_resource is not None:
+                related_resources.append(cached_resource)
+            else:
+                uncached_values.append(inner_val)
+
+        if not uncached_values:
             return related_resources
 
+        print(
+            f"Cache hit for {len(value) - len(uncached_values)} of {len(value)} related resources"
+        )
+        logger.debug(
+            "Falling back to per-resource queries for %s uncached related resources",
+            len(uncached_values),
+        )
         # No bulk cache — fall back to per-resource relation queries.
         # arches_version==9.0.0
         if arches_version >= Version("8.0"):
@@ -116,7 +125,7 @@ class ResourceInstanceDataType(datatypes.ResourceInstanceDataType):
             msg = f"Missing ResourceXResource target: {to_resource_id}"
             logger.warning(msg)
 
-        for inner_val in value:
+        for inner_val in uncached_values:
             if not inner_val:
                 continue
             target_resource_id = uuid.UUID(inner_val["resourceId"])

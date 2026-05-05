@@ -1,12 +1,24 @@
 import uuid
 from itertools import chain
 
+from django.core.cache import caches
+
 from arches.app.datatypes import concept_types
 from arches.app.models.models import Value
 from arches.app.utils.betterJSONSerializer import JSONDeserializer, JSONSerializer
 
 
 class ConceptDataType(concept_types.ConceptDataType):
+    def get_value(self, value_id):
+        if value_id is None:
+            return None
+
+        cached_value = caches["querysets_concept_cache"].get(value_id)
+        if cached_value is None:
+            cached_value = super().get_value(value_id)
+            caches["querysets_concept_cache"].set(value_id, cached_value)
+        return cached_value
+
     def transform_value_for_tile(self, value, **kwargs):
         if isinstance(value, dict) and (value_id := value.get("valueid")):
             return super().transform_value_for_tile(value_id, **kwargs)
@@ -17,44 +29,11 @@ class ConceptDataType(concept_types.ConceptDataType):
     def to_python(self, value, **kwargs):
         return self.get_instance(value)
 
-    def to_json(self, tile, node):
-        data = self.get_tile_data(tile)
-        if not data:
-            return None
-        val = data.get(str(node.nodeid))
-        if val is None:
-            return self.compile_json(tile, node)
-        try:
-            key = uuid.UUID(val)
-        except (TypeError, ValueError):
-            # Unexpected format — fall back to the parent implementation.
-            return super().to_json(tile, node)
-
-        # The datatype instance is a singleton (DataTypeFactory caches it), so
-        # this dict persists across all tiles in the queryset evaluation and
-        # across requests.  Concept values rarely change, making this safe.
-        if not hasattr(self, "_serialized_value_cache"):
-            self._serialized_value_cache = {}
-        if key not in self._serialized_value_cache:
-            value_obj = self.get_value(key)
-            self._serialized_value_cache[key] = (
-                JSONSerializer().serializeToPython(value_obj)
-                if value_obj is not None
-                else {}
-            )
-        return self.compile_json(tile, node, **self._serialized_value_cache[key])
-
     def get_details(self, value, **kwargs):
         instance = self.get_instance(value)
         if not instance:
             return None
-        if not hasattr(self, "_details_cache"):
-            self._details_cache = {}
-        if instance.pk not in self._details_cache:
-            self._details_cache[instance.pk] = JSONDeserializer().deserialize(
-                JSONSerializer().serialize([instance])
-            )
-        return self._details_cache[instance.pk]
+        return JSONSerializer().serializeToPython([instance])
 
     def get_instance(self, value):
         if value is None:
@@ -79,6 +58,16 @@ class ConceptDataType(concept_types.ConceptDataType):
 
 
 class ConceptListDataType(concept_types.ConceptListDataType):
+    def get_value(self, value_id):
+        if value_id is None:
+            return None
+
+        cached_value = caches["querysets_concept_cache"].get(value_id)
+        if cached_value is None:
+            cached_value = super().get_value(value_id)
+            caches["querysets_concept_cache"].set(value_id, cached_value)
+        return cached_value
+
     def transform_value_for_tile(self, value, **kwargs):
         if not value:
             return []
@@ -95,16 +84,7 @@ class ConceptListDataType(concept_types.ConceptListDataType):
         instances = self.get_instances(value)
         if not instances:
             return []
-        # Cache by the ordered tuple of Value PKs.  Same as ConceptDataType,
-        # the singleton datatype instance makes this safe across tiles/requests.
-        if not hasattr(self, "_details_cache"):
-            self._details_cache = {}
-        cache_key = tuple(instance.pk for instance in instances)
-        if cache_key not in self._details_cache:
-            self._details_cache[cache_key] = JSONDeserializer().deserialize(
-                JSONSerializer().serialize(instances)
-            )
-        return self._details_cache[cache_key]
+        return JSONSerializer().serializeToPython(instances)
 
     def get_instances(self, value):
         new_values = []
