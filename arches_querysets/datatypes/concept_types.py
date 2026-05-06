@@ -33,7 +33,7 @@ class ConceptDataType(concept_types.ConceptDataType):
         instance = self.get_instance(value)
         if not instance:
             return None
-        return JSONSerializer().serializeToPython([instance])
+        return JSONDeserializer().deserialize(JSONSerializer().serialize([instance]))
 
     def get_instance(self, value):
         if value is None:
@@ -84,7 +84,7 @@ class ConceptListDataType(concept_types.ConceptListDataType):
         instances = self.get_instances(value)
         if not instances:
             return []
-        return JSONSerializer().serializeToPython(instances)
+        return JSONDeserializer().deserialize(JSONSerializer().serialize(instances))
 
     def get_instances(self, value):
         new_values = []
