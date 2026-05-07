@@ -4,6 +4,8 @@ from itertools import chain
 from django.core.cache import caches
 
 from arches.app.datatypes import concept_types
+
+from arches_querysets.conf import settings as qs_settings
 from arches.app.models.models import Value
 from arches.app.utils.betterJSONSerializer import JSONDeserializer, JSONSerializer
 
@@ -13,10 +15,10 @@ class ConceptDataType(concept_types.ConceptDataType):
         if value_id is None:
             return None
 
-        cached_value = caches["querysets_concept_cache"].get(value_id)
+        cached_value = caches[qs_settings.CONCEPT_CACHE].get(value_id)
         if cached_value is None:
             cached_value = super().get_value(value_id)
-            caches["querysets_concept_cache"].set(value_id, cached_value)
+            caches[qs_settings.CONCEPT_CACHE].set(value_id, cached_value)
         return cached_value
 
     def transform_value_for_tile(self, value, **kwargs):
@@ -62,10 +64,11 @@ class ConceptListDataType(concept_types.ConceptListDataType):
         if value_id is None:
             return None
 
-        cached_value = caches["querysets_concept_cache"].get(value_id)
+        cached_value = caches[qs_settings.CONCEPT_CACHE].get(value_id)
         if cached_value is None:
+            print(f"Cache miss for concept value {value_id}")
             cached_value = super().get_value(value_id)
-            caches["querysets_concept_cache"].set(value_id, cached_value)
+            caches[qs_settings.CONCEPT_CACHE].set(value_id, cached_value)
         return cached_value
 
     def transform_value_for_tile(self, value, **kwargs):

@@ -10,6 +10,8 @@ from arches.app.datatypes import datatypes
 from arches.app.models import models
 
 from django.core.cache import caches
+
+from arches_querysets.conf import settings as qs_settings
 from django.utils.translation import get_language
 from django.utils.translation import gettext as _
 
@@ -83,7 +85,7 @@ class ResourceInstanceDataType(datatypes.ResourceInstanceDataType):
         return models.ResourceInstance.objects.filter(pk__in=all_resource_ids)
 
     def set_display_value_context_in_bulk(self, datatype_context):
-        cache = caches["querysets_resource_instance_cache"]
+        cache = caches[qs_settings.RESOURCE_INSTANCE_CACHE]
         for resource_instance in datatype_context:
             cache.set(str(resource_instance.pk), resource_instance)
 
@@ -92,7 +94,7 @@ class ResourceInstanceDataType(datatypes.ResourceInstanceDataType):
             return []
         related_resources = []
 
-        cache = caches["querysets_resource_instance_cache"]
+        cache = caches[qs_settings.RESOURCE_INSTANCE_CACHE]
         uncached_values = []
         for inner_val in value:
             if not inner_val:
