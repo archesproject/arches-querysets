@@ -601,6 +601,11 @@ class TileTreeOperation:
                     if ":" in error.message:
                         self.parse_required_error(error)
                     raise ValidationError(error.message) from error
+
+                # Since preSave() just ran, now sync vanilla instance fields.
+                for field in field_attnames(upsert_proxy):
+                    setattr(vanilla_instance, field, getattr(upsert_proxy, field))
+
                 (
                     oldprovisionalvalue,
                     newprovisionalvalue,
