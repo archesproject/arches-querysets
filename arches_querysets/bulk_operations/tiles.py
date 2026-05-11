@@ -636,23 +636,7 @@ class TileTreeOperation:
                 delete_proxy._Tile__preDelete(request=self.request)
 
             if self.to_insert:
-                inserted = sorted(
-                    TileModel.objects.bulk_create(self.to_insert), key=attrgetter("pk")
-                )
-                # Pay the cost of a second TileModel -> Tile transform until refactored.
-                refreshed_insert_proxies = list(
-                    Tile.objects.filter(pk__in=[t.pk for t in inserted]).order_by("pk")
-                )
-                for before, after in zip(
-                    insert_proxies, refreshed_insert_proxies, strict=True
-                ):
-                    after._newprovisionalvalue = before._newprovisionalvalue
-                    after._provisional_edit_log_details = (
-                        before._provisional_edit_log_details
-                    )
-                upsert_proxies = refreshed_insert_proxies + update_proxies
-            else:
-                insert_proxies = Tile.objects.none()
+                TileModel.objects.bulk_create(self.to_insert)
             if self.to_update:
                 TileModel.objects.bulk_update(
                     self.to_update,
