@@ -695,26 +695,7 @@ class TileTreeOperation:
     def after_update_all(self):
         for datatype in self.datatype_factory.datatype_instances.values():
             try:
-                if (
-                    datatype.__class__.__name__ == "GeojsonFeatureCollectionDataType"
-                    and self.resourceid
-                ):
-                    nodes_exist_subquery = Node.objects.filter(
-                        nodegroup_id=OuterRef("nodegroup_id"),
-                        datatype="geojson-feature-collection",
-                    )
-                    tiles = (
-                        TileModel.objects.filter(
-                            resourceinstance_id=self.resourceid,
-                        )
-                        .annotate(has_geojson_node=Exists(nodes_exist_subquery))
-                        .filter(has_geojson_node=True)
-                        .all()
-                    )
-                    for tile in tiles:
-                        datatype.after_update_all(tile)
-                else:
-                    datatype.after_update_all()
+                datatype.after_update_all()
             except:
                 # This wide catch can leave the DB in an unusable state, so not only is
                 # this the *last* operation, but durable=True on the transaction.
