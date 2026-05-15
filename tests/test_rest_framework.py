@@ -235,9 +235,7 @@ class RestFrameworkTests(GraphTestCase):
         )
         self.assertIsNone(serializer.data["tileid"])
         # Default values are stocked.
-        self.assertEqual(
-            serializer.data["aliased_data"]["number_alias"], 7
-        )
+        self.assertEqual(serializer.data["aliased_data"]["number_alias"], 7)
 
     def test_bind_data_to_serializer(self):
         # Get some default data from the serializer.
