@@ -40,8 +40,8 @@ class PerformanceTests(GraphTestCase):
             self.assertCountEqual(qs, [self.resource_42, self.resource_none])
 
     def test_get_tiles(self):
-        # 1-22 from test_get_resources()
-        with self.assertNumQueries(22):
+        # 1-21 from test_get_resources()
+        with self.assertNumQueries(21):
             qs = TileTree.get_tiles("datatype_lookups", "datatypes_1")
             self.assertCountEqual(
                 qs, [self.cardinality_1_tile, self.cardinality_1_tile_none]
