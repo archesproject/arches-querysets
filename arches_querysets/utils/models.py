@@ -251,22 +251,24 @@ def append_tiles_recursively(resource_or_tile):
     if not vars(resource_or_tile.aliased_data):
         raise RuntimeError("aliased_data is empty")
 
-    nodegroup_aliases = getattr(
+    known_child_nodegroup_aliases = getattr(
         resource_or_tile.aliased_data, "_nodegroup_aliases", None
     )
-    if nodegroup_aliases is not None:
-        all_items = [
-            (a, getattr(resource_or_tile.aliased_data, a, None))
-            for a in nodegroup_aliases
+    # Without _nodegroup_aliases, vars() includes leaf node value aliases (strings, UUIDs, etc.),
+    # causing append_tile() to raise ValueError for every one.
+    if known_child_nodegroup_aliases is not None:
+        child_nodegroup_items = [
+            (alias, getattr(resource_or_tile.aliased_data, alias, None))
+            for alias in known_child_nodegroup_aliases
         ]
     else:
-        all_items = [
-            (k, v)
-            for k, v in vars(resource_or_tile.aliased_data).items()
-            if k != "_nodegroup_aliases"
+        child_nodegroup_items = [
+            (alias, value)
+            for alias, value in vars(resource_or_tile.aliased_data).items()
+            if alias != "_nodegroup_aliases"
         ]
 
-    for alias, maybe_tiles in all_items:
+    for alias, maybe_tiles in child_nodegroup_items:
         if maybe_tiles in (None, []):
             try:
                 resource_or_tile.append_tile(alias)
