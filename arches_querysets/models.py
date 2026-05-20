@@ -417,7 +417,7 @@ class TileTree(TileModel, AliasedDataMixin):
         """Prevent serialization of the vanilla .data field, as well as properties
         (serializing .parent would cause cycles)."""
         options = {**kwargs}
-        ignored_props = {"data", "parent", "sealed"}
+        ignored_props = {"data", "parent", "sealed", "aliased_data"}
         options["exclude"] = ignored_props | set(options.pop("exclude", {}))
         return JSONSerializer().handle_model(self, **options)
 

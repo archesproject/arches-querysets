@@ -1,4 +1,5 @@
 import uuid
+from collections import defaultdict
 from slugify import slugify
 
 from django.core.exceptions import FieldError, ValidationError
@@ -226,11 +227,14 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
         """
         Call datatype to_python() methods when materializing the QuerySet.
         Memoize fetched nodes.
+        Fetch display values in bulk.
         Attach child tiles to parent tiles and vice versa.
         """
         from arches_querysets.models import AliasedData
 
         aliased_data_to_update = {}
+        values_by_datatype = defaultdict(list)
+        datatype_contexts = {}
         for tile in self._result_cache:
             if tile.aliased_data is None:
                 tile.aliased_data = AliasedData()
@@ -248,10 +252,19 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
                     # seen problems in the wild.
                     tile_data[str(node.pk)] = None
                 aliased_data_to_update[(tile, node)] = node_value
+                values_by_datatype[node.datatype].append(node_value)
 
+        # Get datatype context querysets.
+        for datatype, values in values_by_datatype.items():
+            datatype_instance = DataTypeFactory().get_instance(datatype)
+            bulk_values = datatype_instance.get_display_value_context_in_bulk(values)
+            datatype_instance.set_display_value_context_in_bulk(bulk_values)
+            datatype_contexts[datatype] = bulk_values
+
+        # Set aliased_data property.
         for tile_node_pair, node_value in aliased_data_to_update.items():
             tile, node = tile_node_pair
-            tile.set_aliased_data(node, node_value)
+            tile.set_aliased_data(node, node_value, datatype_contexts)
 
         for tile in self._result_cache:
             self._set_child_tile_data(tile)
