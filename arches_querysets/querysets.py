@@ -234,17 +234,22 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
 
         aliased_data_to_update = {}
         values_by_datatype = defaultdict(list)
-        datatype_contexts = {}
+        nodegroup_nodes_cache = {}
+        datatype_factory = DataTypeFactory()
         for tile in self._result_cache:
             if tile.aliased_data is None:
                 tile.aliased_data = AliasedData()
             else:
                 return  # already set
             tile.sync_private_attributes(self)
-            for node in tile.nodegroup.node_set.all():
+            if tile.nodegroup_id not in nodegroup_nodes_cache:
+                nodegroup_nodes_cache[tile.nodegroup_id] = list(
+                    tile.nodegroup.node_set.all()
+                )
+            for node in nodegroup_nodes_cache[tile.nodegroup_id]:
                 if node.datatype == "semantic":
                     continue
-                datatype_instance = DataTypeFactory().get_instance(node.datatype)
+                datatype_instance = datatype_factory.get_instance(node.datatype)
                 tile_data = datatype_instance.get_tile_data(tile)
                 node_value = tile_data.get(str(node.pk))
                 if node_value is None:
@@ -254,22 +259,20 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
                 aliased_data_to_update[(tile, node)] = node_value
                 values_by_datatype[node.datatype].append(node_value)
 
-        # Get datatype context querysets.
+        # Warm per-datatype caches (e.g. concept value_lookup) in bulk before to_python().
         for datatype, values in values_by_datatype.items():
-            datatype_instance = DataTypeFactory().get_instance(datatype)
-            bulk_values = datatype_instance.get_display_value_context_in_bulk(values)
-            datatype_instance.set_display_value_context_in_bulk(bulk_values)
-            datatype_contexts[datatype] = bulk_values
+            datatype_instance = datatype_factory.get_instance(datatype)
+            bulk_context = datatype_instance.get_display_value_context_in_bulk(values)
+            datatype_instance.set_display_value_context_in_bulk(bulk_context)
 
-        # Set aliased_data property.
-        for tile_node_pair, node_value in aliased_data_to_update.items():
-            tile, node = tile_node_pair
-            tile.set_aliased_data(node, node_value, datatype_contexts)
+        for (tile, node), node_value in aliased_data_to_update.items():
+            tile.set_aliased_data(node, node_value)
 
         for tile in self._result_cache:
             self._set_child_tile_data(tile)
 
     def _set_child_tile_data(self, tile):
+        nodegroup_aliases = set()
         child_tiles = getattr(tile, "_tile_trees", [])
         for child_tile in sorted(
             child_tiles, key=lambda tile_item: tile_item.sortorder or 0
@@ -277,6 +280,7 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
             child_nodegroup_alias = child_tile.find_nodegroup_alias(
                 self.grouping_node_lookup
             )
+            nodegroup_aliases.add(child_nodegroup_alias)
             if child_tile.nodegroup.cardinality == "1" and child_nodegroup_alias:
                 # TODO(arches_version==9.0.0): remove `and child_nodegroup_alias`
                 # which can no longer be null as of v8.
@@ -296,11 +300,8 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
             else getattr(tile.nodegroup, "nodegroup_set")
         )
         for child_nodegroup in child_nodegroups.all():
-            for node in child_nodegroup.node_set.all():
-                if node.pk == child_nodegroup.pk:
-                    grouping_node = node
-                    break
-
+            grouping_node = self.grouping_node_lookup[child_nodegroup.pk]
+            nodegroup_aliases.add(grouping_node.alias)
             if (
                 getattr(tile.aliased_data, grouping_node.alias, NOT_PROVIDED)
                 is NOT_PROVIDED
@@ -310,6 +311,7 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
                     grouping_node.alias,
                     None if child_nodegroup.cardinality == "1" else [],
                 )
+        tile.aliased_data._nodegroup_aliases = nodegroup_aliases
 
 
 class TileTreeIterable(ModelIterable):

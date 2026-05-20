@@ -581,6 +581,9 @@ class TileTree(TileModel, AliasedDataMixin):
                 node_value = blank_tile.data.get(str(node.pk))
                 blank_tile.set_aliased_data(node, node_value)
 
+        # Ensure append_tiles_recursively uses the fast _nodegroup_aliases path, not vars().
+        blank_tile.aliased_data._nodegroup_aliases = set()
+
         def insert_into_aliased_data(nodegroup_alias, item, target):
             try:
                 aliased_data_value = getattr(target.aliased_data, nodegroup_alias)
@@ -594,6 +597,9 @@ class TileTree(TileModel, AliasedDataMixin):
             else:
                 msg = "Attempted to append to a populated cardinality-1 nodegroup"
                 raise RuntimeError(msg)
+            if not hasattr(target.aliased_data, "_nodegroup_aliases"):
+                target.aliased_data._nodegroup_aliases = set()
+            target.aliased_data._nodegroup_aliases.add(nodegroup_alias)
 
         if container is None:
             insert_into_aliased_data(
@@ -660,39 +666,12 @@ class TileTree(TileModel, AliasedDataMixin):
 
         return cleaned_default
 
-    def get_value_with_context(self, node, node_value, datatype_contexts=None):
-        datatype_instance = DataTypeFactory().get_instance(node.datatype)
-        empty_display_values = (None, "", '{"url": "", "url_label": ""}')
-        compiled_json = datatype_instance.to_json(self, node)
-        if datatype_contexts is None:
-            datatype_contexts = {}
-        ret = {
-            "node_value": node_value,
-            "display_value": compiled_json["@display_value"],
-            "details": datatype_instance.get_details(
-                node_value,
-                datatype_context=datatype_contexts.get(node.datatype),
-                # An optional extra hint for the ResourceInstance{list} types
-                # so that prefetched related resources can be used.
-                resource=self.resourceinstance if self.resourceinstance_id else None,
-            ),
-        }
-        if ret["details"] is None:
-            ret["details"] = []
-        if ret["display_value"] in empty_display_values:
-            # Future: upstream this into datatype methods (another hook?)
-            ret["display_value"] = ""
-        return ret
-
-    def set_aliased_data(self, node, node_value, datatype_contexts=None):
-        """Format node_value according to the self._as_representation flag and
-        set it on self.aliased_data."""
+    def set_aliased_data(self, node, node_value):
+        """Set node_value on self.aliased_data, calling to_python() when not as_representation."""
         datatype_instance = DataTypeFactory().get_instance(node.datatype)
 
         if self._as_representation:
-            final_val = self.get_value_with_context(
-                node, node_value, datatype_contexts=datatype_contexts
-            )
+            final_val = node_value
         else:
             if hasattr(datatype_instance, "to_python"):
                 resource = self.resourceinstance if self.resourceinstance_id else None

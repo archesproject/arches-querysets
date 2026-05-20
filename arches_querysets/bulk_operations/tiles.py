@@ -390,11 +390,6 @@ class TileTreeOperation:
                     continue
                 value_to_validate = TileTree.get_default_value(node)
                 tile._incoming_tile.set_aliased_data(node, value_to_validate)
-            if isinstance(value_to_validate, dict):
-                value_to_validate = value_to_validate.get(
-                    "node_value", value_to_validate
-                )
-
             self._run_datatype_methods(tile, value_to_validate, node)
 
     def _run_datatype_methods(self, tile, value_to_validate, node):

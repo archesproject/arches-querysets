@@ -1,5 +1,4 @@
 import uuid
-from collections import defaultdict
 from functools import partial
 
 from django.conf import settings
@@ -380,7 +379,6 @@ class TileAliasedDataSerializer(serializers.ModelSerializer, NodeFetcherMixin):
             raise PermissionError
 
         field_map = super().get_fields()
-        self.finalize_initial_values(field_map)
 
         # __all__ includes children as well.
         if self.Meta.fields == "__all__" and not self.Meta.exclude_children:
@@ -497,35 +495,6 @@ class TileAliasedDataSerializer(serializers.ModelSerializer, NodeFetcherMixin):
         ret[1]["initial"] = TileTree.get_default_value(node)
 
         return ret
-
-    def finalize_initial_values(self, field_map):
-        """Get display values for initial values in bulk if possible."""
-        nodes_by_alias = {node.alias: node for node in self.graph_nodes}
-
-        values_by_datatype = defaultdict(list)
-        for field_name, field in field_map.items():
-            node = nodes_by_alias[field_name]
-            values_by_datatype[node.datatype].append(field.initial)
-
-        datatype_contexts = {}
-        # Get datatype context querysets per serializer (globally would be better.)
-        # Also note this is copied in TileTreeQuerySet._set_aliased_data()
-        for datatype, values in values_by_datatype.items():
-            datatype_instance = DataTypeFactory().get_instance(datatype)
-            bulk_values = datatype_instance.get_display_value_context_in_bulk(values)
-            datatype_instance.set_display_value_context_in_bulk(bulk_values)
-            datatype_contexts[datatype] = bulk_values
-
-        for field_name, field in field_map.items():
-            node = nodes_by_alias[field_name]
-            default_val = field.initial
-            # It's a little roundabout to instantiate a tile like this, but the underlying
-            # methods expect tiles in case there are provisional edits there.
-            dummy_tile = TileTree(data={str(node.pk): default_val})
-            pair = dummy_tile.get_value_with_context(
-                node, node_value=default_val, datatype_contexts=datatype_contexts
-            )
-            field.initial = pair
 
     def to_internal_value(self, data):
         """Make nested aliased data writable."""

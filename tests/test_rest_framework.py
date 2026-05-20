@@ -61,13 +61,7 @@ class RestFrameworkTests(GraphTestCase):
         self.assertIsInstance(uuid.UUID(response.json()["tileid"]), uuid.UUID)
         self.assertEqual(
             response.json()["aliased_data"]["string_alias_n"],
-            {
-                "display_value": "create_value",
-                "node_value": {
-                    "en": {"value": "create_value", "direction": "ltr"},
-                },
-                "details": [],
-            },
+            {"en": {"value": "create_value", "direction": "ltr"}},
         )
         self.assertSequenceEqual(
             EditLog.objects.filter(
@@ -96,13 +90,7 @@ class RestFrameworkTests(GraphTestCase):
         self.assertEqual(response.json()["resourceinstance"], str(self.resource_42.pk))
         self.assertEqual(
             response.json()["aliased_data"]["string_alias_n"],
-            {
-                "display_value": "create_value",
-                "node_value": {
-                    "en": {"value": "create_value", "direction": "ltr"},
-                },
-                "details": [],
-            },
+            {"en": {"value": "create_value", "direction": "ltr"}},
         )
 
     def test_create_nested_tiles_for_new_resource(self):
@@ -131,13 +119,7 @@ class RestFrameworkTests(GraphTestCase):
         parent_data = response.json()["aliased_data"]
         self.assertEqual(
             parent_data["datatypes_1_child"]["aliased_data"]["string_alias_child"],
-            {
-                "display_value": "child_create_value",
-                "node_value": {
-                    "en": {"value": "child_create_value", "direction": "ltr"},
-                },
-                "details": [],
-            },
+            {"en": {"value": "child_create_value", "direction": "ltr"}},
         )
         self.assertEqual(response.status_code, HTTPStatus.CREATED, response.content)
 
@@ -178,13 +160,7 @@ class RestFrameworkTests(GraphTestCase):
         parent_data = response.json()["aliased_data"]["datatypes_1"]["aliased_data"]
         self.assertEqual(
             parent_data["datatypes_1_child"]["aliased_data"]["string_alias_child"],
-            {
-                "display_value": "child_create_value",
-                "node_value": {
-                    "en": {"value": "child_create_value", "direction": "ltr"},
-                },
-                "details": [],
-            },
+            {"en": {"value": "child_create_value", "direction": "ltr"}},
         )
         self.assertEqual(response.status_code, HTTPStatus.CREATED, response.content)
 
@@ -220,13 +196,7 @@ class RestFrameworkTests(GraphTestCase):
         self.assertEqual(response.json()["resourceinstance"], str(self.resource_42.pk))
         self.assertEqual(
             response.json()["aliased_data"]["string_alias"],
-            {
-                "display_value": "update_value",
-                "node_value": {
-                    "en": {"value": "update_value", "direction": "ltr"},
-                },
-                "details": [],
-            },
+            {"en": {"value": "update_value", "direction": "ltr"}},
         )
 
     @unittest.skipIf(arches_version < Version("8.0"), reason="Arches 8+ only logic")
@@ -255,7 +225,7 @@ class RestFrameworkTests(GraphTestCase):
         self.assertEqual(
             serializer.data["aliased_data"]["datatypes_1"]["aliased_data"][
                 "number_alias"
-            ]["node_value"],
+            ],
             7,
         )
 
@@ -265,9 +235,7 @@ class RestFrameworkTests(GraphTestCase):
         )
         self.assertIsNone(serializer.data["tileid"])
         # Default values are stocked.
-        self.assertEqual(
-            serializer.data["aliased_data"]["number_alias"]["node_value"], 7
-        )
+        self.assertEqual(serializer.data["aliased_data"]["number_alias"], 7)
 
     def test_bind_data_to_serializer(self):
         # Get some default data from the serializer.
@@ -521,7 +489,7 @@ class RestFrameworkPerformanceTests(GraphTestCase):
         self.assertContains(response, "datatypes_1_child", status_code=HTTPStatus.OK)
         self.assertEqual(response.json()["count"], 1)
         top_tile = response.json()["results"][0]["aliased_data"]["datatypes_1"]
-        self.assertIsNone(top_tile["aliased_data"]["number_alias"]["node_value"])
+        self.assertIsNone(top_tile["aliased_data"]["number_alias"])
 
     def test_tile_list_view_performance(self):
         # 1: auth
@@ -554,7 +522,7 @@ class RestFrameworkPerformanceTests(GraphTestCase):
         self.assertContains(response, "datatypes_1_child", status_code=HTTPStatus.OK)
         self.assertEqual(response.json()["count"], 1)
         top_tile = response.json()["results"][0]
-        self.assertIsNone(top_tile["aliased_data"]["number_alias"]["node_value"])
+        self.assertIsNone(top_tile["aliased_data"]["number_alias"])
 
     def test_resource_blank_view_performance(self):
         # 1-5: perms

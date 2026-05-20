@@ -251,7 +251,22 @@ def append_tiles_recursively(resource_or_tile):
     if not vars(resource_or_tile.aliased_data):
         raise RuntimeError("aliased_data is empty")
 
-    for alias, maybe_tiles in vars(resource_or_tile.aliased_data).items():
+    nodegroup_aliases = getattr(
+        resource_or_tile.aliased_data, "_nodegroup_aliases", None
+    )
+    if nodegroup_aliases is not None:
+        all_items = [
+            (a, getattr(resource_or_tile.aliased_data, a, None))
+            for a in nodegroup_aliases
+        ]
+    else:
+        all_items = [
+            (k, v)
+            for k, v in vars(resource_or_tile.aliased_data).items()
+            if k != "_nodegroup_aliases"
+        ]
+
+    for alias, maybe_tiles in all_items:
         if maybe_tiles in (None, []):
             try:
                 resource_or_tile.append_tile(alias)
