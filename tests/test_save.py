@@ -78,6 +78,18 @@ class SaveTileTests(GraphTestCase):
         edit_log = EditLog.objects.get(tileinstanceid=tile.pk)
         self.assertEqual(edit_log.newvalue, {})
 
+    def test_update_tile_provisional(self):
+        provisional_editor = User.objects.get(username="tester3")
+        request = HttpRequest()
+        request.user = provisional_editor
+        tile = self.resource_none.aliased_data.datatypes_1
+        tile.aliased_data.number_alias = 43
+        tile.save(request=request)
+        edit_log = EditLog.objects.get(tileinstanceid=tile.pk)
+        self.assertEqual(edit_log.oldvalue, edit_log.newvalue)
+        self.assertNotEqual(edit_log.oldprovisionalvalue, edit_log.newprovisionalvalue)
+        self.assertEqual(edit_log.newprovisionalvalue[str(self.number_node_1.pk)], 43)
+
     def test_fill_blanks(self):
         self.resource_none.tilemodel_set.all().delete()
         self.resource_none.fill_blanks()
