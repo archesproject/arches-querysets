@@ -1,17 +1,17 @@
-from django.db.models import Exists, OuterRef
-
 from arches.app.datatypes import datatypes
-from arches.app.models.models import Node, TileModel
+from arches.app.models.models import Node
 
 
 class GeojsonFeatureCollectionDataType(datatypes.GeojsonFeatureCollectionDataType):
-    def after_update_all(self, tile=None):
-        nodes_exist_subquery = Node.objects.filter(
-            nodegroup_id=OuterRef("nodegroup_id"),
-            datatype="geojson-feature-collection",
+    def after_update_all(self, tile=None, changed_tiles=None):
+        if changed_tiles is None:
+            return super().after_update_all(tile)
+        geojson_nodegroup_ids = set(
+            Node.objects.filter(
+                nodegroup_id__in={t.nodegroup_id for t in changed_tiles},
+                datatype="geojson-feature-collection",
+            ).values_list("nodegroup_id", flat=True)
         )
-        tiles = TileModel.objects.filter(
-            resourceinstance=tile.resourceinstance_id
-        ).filter(Exists(nodes_exist_subquery))
-        for tile in tiles:
-            super().after_update_all(tile)
+        for tile in changed_tiles:
+            if tile.nodegroup_id in geojson_nodegroup_ids:
+                super().after_update_all(tile)

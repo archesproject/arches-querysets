@@ -6,10 +6,13 @@ from arches.app.datatypes.datatypes import (
     DomainListDataType,
     NonLocalizedStringDataType,
     NumberDataType,
-    GeojsonFeatureCollectionDataType,
+    GeojsonFeatureCollectionDataType as CoreGeojsonFeatureCollectionDataType,
 )
 
 from arches_querysets.datatypes import *
+
+# Re-import to override the upstream class
+from arches_querysets.datatypes.geojson import GeojsonFeatureCollectionDataType
 from arches_querysets.fields import (
     ConceptListField,
     DomainListField,
@@ -63,7 +66,7 @@ class DataTypeFactory(datatypes.DataTypeFactory):
                 return DomainListField(null=True)
             case FileListDataType():
                 return django.db.models.JSONField(default=list, null=True)
-            case GeojsonFeatureCollectionDataType():
+            case CoreGeojsonFeatureCollectionDataType():
                 return django.db.models.JSONField(default=list, null=True)
             case _:
                 return django.db.models.TextField(null=True)
