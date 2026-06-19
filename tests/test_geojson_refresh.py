@@ -28,8 +28,8 @@ class GeojsonAfterUpdateAllTests(GraphTestCase):
         self.geojson_nodegroup_ids = {self.nodegroup_1.pk, self.nodegroup_n.pk}
 
     def test_uses_per_tile_refresh_not_whole_table(self):
-        # The factory must build our subclass (the changed_tiles override), which
-        # inherits arches' geojson datatype -- not the bare upstream class.
+        # inherits arches' geojson datatype -- not the bare upstream class
+        # this was a bug earlier I believe
         factory_cls = type(DataTypeFactory().get_instance("geojson-feature-collection"))
         base = geojson_feature_collection.GeojsonFeatureCollectionDataType
         self.assertTrue(issubclass(factory_cls, base))
@@ -51,8 +51,6 @@ class GeojsonAfterUpdateAllTests(GraphTestCase):
         self.assertIn(tiles[0].nodegroup_id, self.geojson_nodegroup_ids)
 
     def test_each_changed_tile_refreshed_once(self):
-        # Change a tile on *both* geojson nodegroups -- each gets exactly one
-        # targeted refresh (no dupes, no whole-table refresh).
         self.resource.aliased_data.datatypes_1.aliased_data.non_localized_string_alias = (
             "changed-1"
         )
