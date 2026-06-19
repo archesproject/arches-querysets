@@ -18,10 +18,12 @@ def _refreshed_tiles(refresh_mock):
 
 class GeojsonAfterUpdateAllTests(GraphTestCase):
     def setUp(self):
-        # A file-list value never round-trips equal to its stored raw value, so it
-        # makes even an unchanged tile look dirty (and get refreshed). Drop the
-        # node so only genuinely-changed tiles are refreshed.
-        Node.objects.filter(graph=self.graph, datatype="file-list").delete()
+        # Drop datatypes that don't round-trip equal to their stored value (file-list
+        # transforms files; arches < 8.0 reads our date back as an ISO timestamp),
+        # else an unchanged tile looks dirty and gets refreshed.
+        Node.objects.filter(
+            graph=self.graph, datatype__in={"file-list", "date"}
+        ).delete()
         self.resource = ResourceTileTree.get_tiles("datatype_lookups").get(
             pk=self.resource_42.pk
         )
