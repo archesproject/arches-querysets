@@ -6,7 +6,7 @@ from arches.app.datatypes.datatypes import (
     DomainListDataType,
     NonLocalizedStringDataType,
     NumberDataType,
-    GeojsonFeatureCollectionDataType
+    GeojsonFeatureCollectionDataType,
 )
 
 from arches_querysets.datatypes import *
