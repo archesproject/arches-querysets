@@ -40,6 +40,7 @@ from arches_querysets.fields import (
     ResourceInstanceListField,
 )
 
+
 DATATYPES_NEEDING_KEY_TEXT_TRANSFORM = {
     "non-localized-string",
     "date",
