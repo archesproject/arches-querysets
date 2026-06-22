@@ -11,8 +11,6 @@ from arches.app.datatypes.datatypes import (
 
 from arches_querysets.datatypes import *
 
-# Re-import to override the upstream class
-from arches_querysets.datatypes.geojson import GeojsonFeatureCollectionDataType
 from arches_querysets.fields import (
     ConceptListField,
     DomainListField,
