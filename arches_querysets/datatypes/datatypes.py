@@ -10,7 +10,6 @@ from arches.app.datatypes.datatypes import (
 )
 
 from arches_querysets.datatypes import *
-
 from arches_querysets.fields import (
     ConceptListField,
     DomainListField,
