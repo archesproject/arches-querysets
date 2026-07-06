@@ -1,6 +1,8 @@
 import json
+import uuid
 from unittest.mock import Mock
 
+from arches.app.models.models import File as FileModel
 from arches_querysets.models import ResourceTileTree
 from arches_querysets.utils.tests import GraphTestCase
 
@@ -435,3 +437,82 @@ class DatatypeMethodTests(GraphTestCase):
                         )
                     else:
                         self.assertEqual(transformed_value, value["output"])
+
+    def test_file_list_preserves_existing_file_id_on_existing_tile(self):
+        """When is_existing_tile=True and a file dict already has a file_id and url,
+        transform_value_for_tile must pass it through unchanged without creating a
+        new File record in the database."""
+        datatype = self.datatype_factory.get_instance(datatype="file-list")
+        existing_file_id = str(uuid.uuid4())
+        existing_url = f"/files/{existing_file_id}"
+
+        value = [
+            {
+                "file_id": existing_file_id,
+                "url": existing_url,
+                "name": "existing_photo.jpg",
+                "type": "image/jpeg",
+                "status": "uploaded",
+                "size": 12345,
+                "accepted": True,
+            }
+        ]
+
+        file_count_before = FileModel.objects.count()
+        result = datatype.transform_value_for_tile(value, is_existing_tile=True)
+        file_count_after = FileModel.objects.count()
+
+        with self.subTest("file_id is preserved unchanged"):
+            self.assertEqual(result[0]["file_id"], existing_file_id)
+
+        with self.subTest("url is preserved unchanged"):
+            self.assertEqual(result[0]["url"], existing_url)
+
+        with self.subTest("no new File record is created"):
+            self.assertEqual(file_count_before, file_count_after)
+
+        with self.subTest("no File record is created for the existing file_id"):
+            self.assertFalse(FileModel.objects.filter(fileid=existing_file_id).exists())
+
+    def test_file_list_mixed_existing_and_new_on_existing_tile(self):
+        """When is_existing_tile=True with a mix of already-stored files (have
+        file_id) and new files (no file_id), existing file_ids are preserved and
+        exactly one new File record is created for the new file."""
+        datatype = self.datatype_factory.get_instance(datatype="file-list")
+        existing_file_id = str(uuid.uuid4())
+        existing_url = f"/files/{existing_file_id}"
+
+        value = [
+            {
+                "file_id": existing_file_id,
+                "url": existing_url,
+                "name": "existing_photo.jpg",
+                "type": "image/jpeg",
+                "status": "uploaded",
+                "accepted": True,
+            },
+            {
+                "name": "new_photo.jpg",
+                "type": "image/jpeg",
+            },
+        ]
+
+        file_count_before = FileModel.objects.count()
+        result = datatype.transform_value_for_tile(value, is_existing_tile=True)
+        file_count_after = FileModel.objects.count()
+
+        with self.subTest("existing file_id is preserved"):
+            self.assertEqual(result[0]["file_id"], existing_file_id)
+
+        with self.subTest("existing url is preserved"):
+            self.assertEqual(result[0]["url"], existing_url)
+
+        with self.subTest("new file receives a generated file_id"):
+            self.assertIsNotNone(result[1].get("file_id"))
+            self.assertNotEqual(result[1]["file_id"], existing_file_id)
+
+        with self.subTest("exactly one new File record created (for the new file)"):
+            self.assertEqual(file_count_after - file_count_before, 1)
+
+        with self.subTest("no File record created for the existing file_id"):
+            self.assertFalse(FileModel.objects.filter(fileid=existing_file_id).exists())

@@ -1,4 +1,5 @@
 from django.utils.translation import get_language
+from uuid import UUID
 
 from arches import __version__ as _arches_version_str
 from packaging.version import Version
@@ -33,17 +34,15 @@ class FileListDataType(datatypes.FileListDataType):
         if arches_version < Version("8.1"):
             original_value = value
             if isinstance(value, str):
-                stringified_list = value
+                pass  # parent handles CSV strings directly
             elif isinstance(value, list) and all(
                 isinstance(file_info, dict) for file_info in value
             ):
-                stringified_list = ",".join(
-                    [file_info.get("name") for file_info in value]
-                )
+                pass  # parent now handles list of dicts directly
             else:
                 raise TypeError(value)
             value = super().transform_value_for_tile(
-                stringified_list, languages=languages, **kwargs
+                value, languages=languages, **kwargs
             )
             new_value = []
             for file in value:
@@ -73,7 +72,7 @@ class FileListDataType(datatypes.FileListDataType):
             "is_existing_tile" not in kwargs or not kwargs["is_existing_tile"]
         ):
             File.objects.filter(
-                fileid__in=[file["file_id"] for file in new_value]
+                fileid__in=[file["file_id"] for file in new_value if file["file_id"] and isinstance(file["file_id"], UUID)]
             ).delete()
             for file_dict in new_value:
                 file_dict["file_id"] = None
