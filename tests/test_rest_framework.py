@@ -918,18 +918,28 @@ class RestFrameworkTests(GraphTestCase):
         self,
     ):
         client_tileid = str(uuid.uuid4())
+        parent_tile = self.resource_42.aliased_data.datatypes_1
         update_url = reverse(
             "arches_querysets:api-resource",
             kwargs={"graph": "datatype_lookups", "pk": str(self.resource_42.pk)},
         )
         request_body = {
             "aliased_data": {
-                "datatypes_n": [
-                    {
-                        "tileid": client_tileid,
-                        "aliased_data": {"string_alias_n": "verify_tileid_value"},
-                    }
-                ],
+                "datatypes_1": {
+                    "tileid": str(parent_tile.pk),
+                    "resourceinstance": str(self.resource_42.pk),
+                    "aliased_data": {
+                        "datatypes_1_n_child": [
+                            {
+                                "tileid": client_tileid,
+                                "resourceinstance": str(self.resource_42.pk),
+                                "aliased_data": {
+                                    "non_localized_string_alias_1_n_child": "verify_tileid_value"
+                                },
+                            }
+                        ],
+                    },
+                },
             },
         }
         self.client.login(username="dev", password="dev")
@@ -937,11 +947,17 @@ class RestFrameworkTests(GraphTestCase):
             update_url, request_body, content_type="application/json"
         )
         self.assertEqual(response.status_code, HTTPStatus.OK, response.content)
-        new_tiles = response.json()["aliased_data"]["datatypes_n"]
+
+        def _nv(v):
+            return v["node_value"] if isinstance(v, dict) else v
+
+        new_children = response.json()["aliased_data"]["datatypes_1"]["aliased_data"][
+            "datatypes_1_n_child"
+        ]
         matching = [
-            new_tile
-            for new_tile in new_tiles
-            if new_tile["aliased_data"]["string_alias_n"]["node_value"]["en"]["value"]
+            child
+            for child in new_children
+            if _nv(child["aliased_data"]["non_localized_string_alias_1_n_child"])
             == "verify_tileid_value"
         ]
         self.assertEqual(len(matching), 1)

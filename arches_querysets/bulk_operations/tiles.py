@@ -277,6 +277,9 @@ class TileTreeOperation:
                     ),
                     "parenttile_id": existing_tile.parenttile_id,
                 }
+                # Deserializing new_tile doesn't set nodegroup_id; new child
+                # tiles inserted under it need it set as their parenttile.
+                new_tile.nodegroup_id = grouping_node.nodegroup_id
                 existing_tile._incoming_tile = new_tile
                 if new_tile.sortorder is not None:
                     existing_tile.sortorder = new_tile.sortorder
