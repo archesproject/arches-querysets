@@ -1,6 +1,8 @@
 import json
 from unittest.mock import Mock
 
+from arches.app.models.models import File
+
 from arches_querysets.models import ResourceTileTree
 from arches_querysets.utils.tests import GraphTestCase
 
@@ -435,3 +437,43 @@ class DatatypeMethodTests(GraphTestCase):
                         )
                     else:
                         self.assertEqual(transformed_value, value["output"])
+
+    def test_transform_value_for_tile_new_file_on_existing_tile(self):
+        datatype_instance = self.datatype_factory.get_instance(datatype="file-list")
+
+        transformed_value = datatype_instance.transform_value_for_tile(
+            [{"name": "new-photo.jpg", "type": "image/jpeg"}],
+            is_existing_tile=True,
+        )
+
+        self.assertEqual(len(transformed_value), 1)
+        self.assertIsNone(transformed_value[0]["file_id"])
+        self.assertIsNone(transformed_value[0]["url"])
+        self.assertEqual(File.objects.count(), 0)
+
+    def test_transform_value_for_tile_mixed_files_on_existing_tile(self):
+        pre_existing_file = File.objects.create(path="uploadedfiles/existing.jpg")
+        datatype_instance = self.datatype_factory.get_instance(datatype="file-list")
+
+        transformed_value = datatype_instance.transform_value_for_tile(
+            [
+                {
+                    "name": "existing.jpg",
+                    "file_id": str(pre_existing_file.pk),
+                    "url": f"/files/{pre_existing_file.pk}",
+                },
+                {"name": "new-photo.jpg", "type": "image/jpeg"},
+            ],
+            is_existing_tile=True,
+        )
+
+        self.assertEqual(len(transformed_value), 2)
+
+        self.assertEqual(transformed_value[0]["file_id"], str(pre_existing_file.pk))
+        self.assertEqual(transformed_value[0]["url"], f"/files/{pre_existing_file.pk}")
+
+        self.assertIsNone(transformed_value[1]["file_id"])
+        self.assertIsNone(transformed_value[1]["url"])
+
+        self.assertTrue(File.objects.filter(pk=pre_existing_file.pk).exists())
+        self.assertEqual(File.objects.count(), 1)

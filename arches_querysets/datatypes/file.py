@@ -29,9 +29,9 @@ class FileListDataType(datatypes.FileListDataType):
         if not languages:  # pragma: no cover
             languages = models.Language.objects.all()
         language = get_language()
+        original_value = value
         # arches == 9.0.0 - remove the stringifieid_list in favor of the 8.1.0 logic
         if arches_version < Version("8.1"):
-            original_value = value
             if isinstance(value, str):
                 stringified_list = value
             elif isinstance(value, list) and all(
@@ -65,19 +65,32 @@ class FileListDataType(datatypes.FileListDataType):
                 value, languages=languages, **kwargs
             )
 
-        # Remove file object created in transform_value_for_tile
-        # after discussion with chiatt, this behavior is only really needed
-        # for the bulk loader (and causes integrity problems/duplicity) -
-        # file will be recreated later in post_tile_save.  Skip this deletion
-        if "bulk_import" not in kwargs and (
-            "is_existing_tile" not in kwargs or not kwargs["is_existing_tile"]
-        ):
-            File.objects.filter(
-                fileid__in=[file["file_id"] for file in new_value]
-            ).delete()
-            for file_dict in new_value:
-                file_dict["file_id"] = None
-                file_dict["url"] = None
+        # Undo the phantom file/file_id fabricated above for genuinely new
+        # entries ( no file_id in the original payload ), so post_tile_save
+        # can link the real upload.
+        if "bulk_import" not in kwargs:
+            # Can't align positionally; skip rather than risk deleting a
+            # File row we can't positively identify as brand-new.
+            new_file_dicts = []
+            if isinstance(original_value, list) and len(original_value) == len(
+                new_value
+            ):
+                new_file_dicts = [
+                    file_dict
+                    for original_entry, file_dict in zip(original_value, new_value)
+                    if not (
+                        isinstance(original_entry, dict)
+                        and original_entry.get("file_id")
+                    )
+                ]
+
+            if new_file_dicts:
+                File.objects.filter(
+                    fileid__in=[file_dict["file_id"] for file_dict in new_file_dicts]
+                ).delete()
+                for file_dict in new_file_dicts:
+                    file_dict["file_id"] = None
+                    file_dict["url"] = None
 
         for file_info in new_value:
             for key, val in file_info.items():
