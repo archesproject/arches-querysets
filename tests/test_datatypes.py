@@ -1,5 +1,8 @@
 import json
-from unittest.mock import Mock
+import uuid
+from unittest.mock import Mock, patch
+
+from packaging.version import Version
 
 from arches.app.models.models import File
 
@@ -477,3 +480,43 @@ class DatatypeMethodTests(GraphTestCase):
 
         self.assertTrue(File.objects.filter(pk=pre_existing_file.pk).exists())
         self.assertEqual(File.objects.count(), 1)
+
+    def test_transform_value_for_tile_mixed_files_on_existing_tile_pre_8_1(self):
+        # Pre-8.1, the base class reconstructs entries by name, not
+        # position, so the reset must not assume matching order.
+        pre_existing_file = File.objects.create(path="uploadedfiles/existing.jpg")
+        datatype_instance = self.datatype_factory.get_instance(datatype="file-list")
+
+        reordered_base_output = [
+            {"name": "new-photo.jpg", "file_id": str(uuid.uuid4()), "url": "/fake"},
+            {
+                "name": "existing.jpg",
+                "file_id": str(uuid.uuid4()),
+                "url": "/fake",
+            },
+        ]
+
+        with (
+            patch("arches_querysets.datatypes.file.arches_version", Version("8.0.99")),
+            patch(
+                "arches.app.datatypes.datatypes.FileListDataType"
+                ".transform_value_for_tile",
+                return_value=reordered_base_output,
+            ),
+        ):
+            transformed_value = datatype_instance.transform_value_for_tile(
+                [
+                    {
+                        "name": "existing.jpg",
+                        "file_id": str(pre_existing_file.pk),
+                        "url": f"/files/{pre_existing_file.pk}",
+                    },
+                    {"name": "new-photo.jpg", "type": "image/jpeg"},
+                ],
+                is_existing_tile=True,
+            )
+
+        by_name = {entry["name"]: entry for entry in transformed_value}
+        self.assertEqual(by_name["existing.jpg"]["file_id"], str(pre_existing_file.pk))
+        self.assertIsNone(by_name["new-photo.jpg"]["file_id"])
+        self.assertTrue(File.objects.filter(pk=pre_existing_file.pk).exists())

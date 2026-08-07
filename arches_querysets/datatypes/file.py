@@ -30,6 +30,12 @@ class FileListDataType(datatypes.FileListDataType):
             languages = models.Language.objects.all()
         language = get_language()
         original_value = value
+        reset_fabricated_ids = "bulk_import" not in kwargs
+        # Entries to undo the phantom file/file_id fabricated below for
+        # genuinely new entries (no file_id in the original payload), so
+        # post_tile_save can link the real upload.
+        fabricated_file_dicts = []
+
         # arches == 9.0.0 - remove the stringifieid_list in favor of the 8.1.0 logic
         if arches_version < Version("8.1"):
             if isinstance(value, str):
@@ -47,35 +53,41 @@ class FileListDataType(datatypes.FileListDataType):
             )
             new_value = []
             for file in value:
-                if not isinstance(original_value, str):
-                    matching_file_info = next(
-                        (
-                            file_dict
-                            for file_dict in original_value
-                            if file_dict.get("name") == file.get("name")
-                        ),
-                        None,
-                    )
-                    if matching_file_info:
-                        new_value.append({**matching_file_info, **file})
-                else:
+                if isinstance(original_value, str):
                     new_value.append(file)
+                    continue
+
+                matching_file_info = next(
+                    (
+                        file_dict
+                        for file_dict in original_value
+                        if file_dict.get("name") == file.get("name")
+                    ),
+                    None,
+                )
+                if not matching_file_info:
+                    continue
+
+                if matching_file_info.get("file_id"):
+                    merged_file_info = {**file, **matching_file_info}
+                else:
+                    merged_file_info = {**matching_file_info, **file}
+                    if reset_fabricated_ids:
+                        fabricated_file_dicts.append(merged_file_info)
+                new_value.append(merged_file_info)
         else:
             new_value = super().transform_value_for_tile(
                 value, languages=languages, **kwargs
             )
 
-        # Undo the phantom file/file_id fabricated above for genuinely new
-        # entries ( no file_id in the original payload ), so post_tile_save
-        # can link the real upload.
-        if "bulk_import" not in kwargs:
-            # Can't align positionally; skip rather than risk deleting a
-            # File row we can't positively identify as brand-new.
-            new_file_dicts = []
-            if isinstance(original_value, list) and len(original_value) == len(
-                new_value
+            # If lengths ever diverge we can't align by position; skip the
+            # reset rather than risk deleting the wrong File row.
+            if (
+                reset_fabricated_ids
+                and isinstance(original_value, list)
+                and len(original_value) == len(new_value)
             ):
-                new_file_dicts = [
+                fabricated_file_dicts = [
                     file_dict
                     for original_entry, file_dict in zip(original_value, new_value)
                     if not (
@@ -84,13 +96,13 @@ class FileListDataType(datatypes.FileListDataType):
                     )
                 ]
 
-            if new_file_dicts:
-                File.objects.filter(
-                    fileid__in=[file_dict["file_id"] for file_dict in new_file_dicts]
-                ).delete()
-                for file_dict in new_file_dicts:
-                    file_dict["file_id"] = None
-                    file_dict["url"] = None
+        if fabricated_file_dicts:
+            File.objects.filter(
+                fileid__in=[file_dict["file_id"] for file_dict in fabricated_file_dicts]
+            ).delete()
+            for file_dict in fabricated_file_dicts:
+                file_dict["file_id"] = None
+                file_dict["url"] = None
 
         for file_info in new_value:
             for key, val in file_info.items():
