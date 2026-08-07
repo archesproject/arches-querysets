@@ -35,6 +35,7 @@ class FileListDataType(datatypes.FileListDataType):
         # genuinely new entries (no file_id in the original payload), so
         # post_tile_save can link the real upload.
         fabricated_file_dicts = []
+        file_ids_to_delete = []
 
         # arches == 9.0.0 - remove the stringifieid_list in favor of the 8.1.0 logic
         if arches_version < Version("8.1"):
@@ -70,8 +71,17 @@ class FileListDataType(datatypes.FileListDataType):
 
                 if matching_file_info.get("file_id"):
                     merged_file_info = {**file, **matching_file_info}
+                    phantom_file_id = file.get("file_id")
+
+                    if (
+                        reset_fabricated_ids
+                        and phantom_file_id
+                        and phantom_file_id != matching_file_info["file_id"]
+                    ):
+                        file_ids_to_delete.append(phantom_file_id)
                 else:
                     merged_file_info = {**matching_file_info, **file}
+
                     if reset_fabricated_ids:
                         fabricated_file_dicts.append(merged_file_info)
                 new_value.append(merged_file_info)
@@ -96,13 +106,15 @@ class FileListDataType(datatypes.FileListDataType):
                     )
                 ]
 
-        if fabricated_file_dicts:
-            File.objects.filter(
-                fileid__in=[file_dict["file_id"] for file_dict in fabricated_file_dicts]
-            ).delete()
-            for file_dict in fabricated_file_dicts:
-                file_dict["file_id"] = None
-                file_dict["url"] = None
+        file_ids_to_delete.extend(
+            file_dict["file_id"] for file_dict in fabricated_file_dicts
+        )
+        if file_ids_to_delete:
+            File.objects.filter(fileid__in=file_ids_to_delete).delete()
+
+        for file_dict in fabricated_file_dicts:
+            file_dict["file_id"] = None
+            file_dict["url"] = None
 
         for file_info in new_value:
             for key, val in file_info.items():

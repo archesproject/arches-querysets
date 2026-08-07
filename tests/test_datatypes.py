@@ -1,5 +1,4 @@
 import json
-import uuid
 from unittest.mock import Mock, patch
 
 from packaging.version import Version
@@ -487,11 +486,19 @@ class DatatypeMethodTests(GraphTestCase):
         pre_existing_file = File.objects.create(path="uploadedfiles/existing.jpg")
         datatype_instance = self.datatype_factory.get_instance(datatype="file-list")
 
+        # The real base class persists a fresh File row for every name in
+        # the stringified list it's given, even ones that already have one.
+        phantom_new_file = File.objects.create(path="uploadedfiles/new-photo.jpg")
+        phantom_existing_file = File.objects.create(path="uploadedfiles/existing.jpg")
         reordered_base_output = [
-            {"name": "new-photo.jpg", "file_id": str(uuid.uuid4()), "url": "/fake"},
+            {
+                "name": "new-photo.jpg",
+                "file_id": str(phantom_new_file.pk),
+                "url": "/fake",
+            },
             {
                 "name": "existing.jpg",
-                "file_id": str(uuid.uuid4()),
+                "file_id": str(phantom_existing_file.pk),
                 "url": "/fake",
             },
         ]
@@ -519,4 +526,9 @@ class DatatypeMethodTests(GraphTestCase):
         by_name = {entry["name"]: entry for entry in transformed_value}
         self.assertEqual(by_name["existing.jpg"]["file_id"], str(pre_existing_file.pk))
         self.assertIsNone(by_name["new-photo.jpg"]["file_id"])
+
+        # Only the real, pre-existing File row survives; both phantom rows
+        # the base class fabricated (for the existing entry and the new
+        # one) are cleaned up.
         self.assertTrue(File.objects.filter(pk=pre_existing_file.pk).exists())
+        self.assertEqual(File.objects.count(), 1)
