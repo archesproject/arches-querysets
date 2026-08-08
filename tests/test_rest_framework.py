@@ -1180,14 +1180,14 @@ class RestFrameworkPerformanceTests(GraphTestCase):
         # 17: resource count (paginator)
         # 18: select resources limit 500
         # 19: tile depth 1
-        # 20: resourcexresource depth 1
-        # 21: tile depth 2
-        # 22: resourcexresource depth 2
-        # 23: tile depth 3: none!
-        # 24-26: arches perms (BUG: core arches)
-        num_queries = 26
+        # 20: tile depth 2
+        # 21: tile depth 3: none!
+        # 22-25: arches perms (BUG: core arches)
+        num_queries = 25
         if arches_version < Version("8.1.0a0"):
             num_queries += 1  # extra user profile query on Arches 8.0 and below.
+        if arches_version < Version("8.2.0a8"):
+            num_queries += 1  # extra django-guardian query below 3.3.2.
         with self.assertNumQueries(num_queries):
             response = self.client.get(
                 reverse(
@@ -1210,14 +1210,14 @@ class RestFrameworkPerformanceTests(GraphTestCase):
         # 4-16: PerformanceTests.test_get_graph_objects()
         # 17: tile count (paginator)
         # 18: select tiles limit 500
-        # 19: resourcexresource depth 1
-        # 20: tile depth 2
-        # 21: resourcexresource depth 2
-        # 22: tile depth 3: none!
-        # 23-25: arches perms (BUG: core arches)
-        num_queries = 25
+        # 19: tile depth 2
+        # 20: tile depth 3: none!
+        # 21-24: arches perms (BUG: core arches)
+        num_queries = 24
         if arches_version < Version("8.1.0a0"):
             num_queries += 1  # extra user profile query on Arches 8.0 and below.
+        if arches_version < Version("8.2.0a8"):
+            num_queries += 1  # extra django-guardian query below 3.3.2.
         with self.assertNumQueries(num_queries):
             response = self.client.get(
                 reverse(
@@ -1237,12 +1237,14 @@ class RestFrameworkPerformanceTests(GraphTestCase):
         self.assertIsNone(top_tile["aliased_data"]["number_alias"]["node_value"])
 
     def test_resource_blank_view_performance(self):
-        # 1-5: perms
-        # 6: get_nodegroup_alias_lookup()
-        # 7-11: NodeFetcherMixin._find_graph_nodes()
-        num_queries = 11
+        # 1-4: perms
+        # 5: get_nodegroup_alias_lookup()
+        # 6-10: NodeFetcherMixin._find_graph_nodes()
+        num_queries = 10
         if arches_version < Version("8.1.0a0"):
             num_queries += 1  # extra user profile query on Arches 8.0 and below.
+        if arches_version < Version("8.2.0a8"):
+            num_queries += 1  # extra django-guardian query below 3.3.2.
         with self.assertNumQueries(num_queries):
             response = self.client.get(
                 reverse(
