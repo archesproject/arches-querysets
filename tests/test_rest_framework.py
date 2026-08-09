@@ -21,7 +21,6 @@ from arches_querysets.rest_framework.serializers import (
 from arches_querysets.utils.models import ensure_request
 from arches_querysets.utils.tests import GraphTestCase
 
-
 MUTABLE_PERMITTED_NODEGROUPS = set()
 
 
