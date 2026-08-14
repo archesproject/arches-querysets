@@ -1036,6 +1036,73 @@ class RestFrameworkTests(GraphTestCase):
             # No orphans: exactly the pre-existing File row plus the new one.
             self.assertEqual(File.objects.count(), 2)
 
+    def test_update_tile_removes_file_dropped_from_list(self):
+        with override_settings(MEDIA_ROOT=tempfile.mkdtemp()):
+            kept_file = File.objects.create(path="uploadedfiles/kept.jpg")
+            dropped_file = File.objects.create(path="uploadedfiles/dropped.jpg")
+
+            update_url = reverse(
+                "arches_querysets:api-tile",
+                kwargs={
+                    "graph": "datatype_lookups",
+                    "nodegroup_alias": "datatypes_1",
+                    "pk": self.resource_42.aliased_data.datatypes_1.pk,
+                },
+            )
+            self.client.login(username="dev", password="dev")
+
+            # Establish real, persisted tile state with two files.
+            seed_body = {
+                "aliased_data": {
+                    "file_list_alias": [
+                        {
+                            "name": "kept.jpg",
+                            "file_id": str(kept_file.pk),
+                            "url": f"/files/{kept_file.pk}",
+                        },
+                        {
+                            "name": "dropped.jpg",
+                            "file_id": str(dropped_file.pk),
+                            "url": f"/files/{dropped_file.pk}",
+                        },
+                    ],
+                },
+                "resourceinstance": str(self.resource_42.pk),
+            }
+            seed_response = self.client.patch(
+                update_url, seed_body, content_type="application/json"
+            )
+            self.assertEqual(
+                seed_response.status_code, HTTPStatus.OK, seed_response.content
+            )
+
+            # Drop dropped.jpg from the list.
+            update_body = {
+                "aliased_data": {
+                    "file_list_alias": [
+                        {
+                            "name": "kept.jpg",
+                            "file_id": str(kept_file.pk),
+                            "url": f"/files/{kept_file.pk}",
+                        },
+                    ],
+                },
+                "resourceinstance": str(self.resource_42.pk),
+            }
+            response = self.client.patch(
+                update_url, update_body, content_type="application/json"
+            )
+            self.assertEqual(response.status_code, HTTPStatus.OK, response.content)
+
+            updated_files = response.json()["aliased_data"]["file_list_alias"][
+                "node_value"
+            ]
+            self.assertEqual(len(updated_files), 1)
+            self.assertEqual(updated_files[0]["name"], "kept.jpg")
+
+            self.assertTrue(File.objects.filter(pk=kept_file.pk).exists())
+            self.assertFalse(File.objects.filter(pk=dropped_file.pk).exists())
+
     @unittest.skipIf(arches_version < Version("8.0"), reason="Arches 8+ only logic")
     def test_out_of_date_resource(self):
         Graph.objects.get(pk=self.graph.pk).publish(user=None)

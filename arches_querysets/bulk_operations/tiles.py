@@ -590,6 +590,8 @@ class TileTreeOperation:
                     upsert_proxy._existing_data = upsert_proxy.data
                 upsert_proxy._existing_provisionaledits = upsert_proxy.provisionaledits
 
+                vanilla_instance._existing_data = upsert_proxy._existing_data
+
                 # Sync proxy instance fields.
                 for field in field_attnames(vanilla_instance):
                     setattr(upsert_proxy, field, getattr(vanilla_instance, field))

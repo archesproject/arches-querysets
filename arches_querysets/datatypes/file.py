@@ -12,6 +12,26 @@ from arches.app.models.models import File
 class FileListDataType(datatypes.FileListDataType):
     localized_metadata_keys = {"altText", "attribution", "description", "title"}
 
+    def post_tile_save(self, tile, nodeid, request):
+        # Can't rely on core's db requery for the old value here, it's
+        # already been overwritten by the time bulk save calls this.
+        previously_saved_data = getattr(tile, "_existing_data", None) or {}
+        previous_file_ids = {
+            file_info["file_id"]
+            for file_info in previously_saved_data.get(nodeid) or []
+            if file_info.get("file_id")
+        }
+        current_file_ids = {
+            file_info["file_id"]
+            for file_info in tile.data.get(nodeid) or []
+            if file_info.get("file_id")
+        }
+        removed_file_ids = previous_file_ids - current_file_ids
+        if removed_file_ids:
+            File.objects.filter(fileid__in=removed_file_ids).delete()
+
+        super().post_tile_save(tile, nodeid, request)
+
     def get_display_value(self, tile, node, **kwargs):
         data = self.get_tile_data(tile)
         files = data[str(node.nodeid)]
