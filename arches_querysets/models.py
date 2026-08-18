@@ -43,6 +43,32 @@ import arches.app.utils.task_management as task_management
 logger = logging.getLogger(__name__)
 
 
+def _index_resource_after_save(proxy_resource):
+    """Index a saved resource without letting an indexing failure fail the write.
+
+    By the time this runs the tile transaction has already committed
+    (TileTreeOperation._perform_transaction uses durable=True), so raising here
+    cannot undo the write. It only turns a successful write into a 500, which
+    prompts clients to retry and duplicate the data that was in fact saved.
+    """
+    if (
+        getattr(settings, "EVENTUALLY_CONSISTENT_ES_INDEXING", False)
+        and task_management.check_if_celery_available()
+    ):
+        index_resource.apply_async((str(proxy_resource.pk),))
+        return
+
+    try:
+        proxy_resource.index()
+    except Exception:
+        logger.error(
+            "Failed to index resource %s after saving it. The write itself "
+            "succeeded; reindex this resource to restore search consistency.",
+            proxy_resource.pk,
+            exc_info=True,
+        )
+
+
 class AliasedData(SimpleNamespace):
     """Provides dot access into node values and nested nodegroups by alias.
 
@@ -313,13 +339,7 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
         proxy_resource.save_descriptors()
 
         if index:
-            if (
-                getattr(settings, "EVENTUALLY_CONSISTENT_ES_INDEXING", False)
-                and task_management.check_if_celery_available()
-            ):
-                index_resource.apply_async((self.resourceinstanceid,))
-            else:
-                proxy_resource.index()
+            _index_resource_after_save(proxy_resource)
 
         # arches_version==9.0.0
         if arches_version < Version("8.0") and request and for_new_resource:
@@ -959,13 +979,7 @@ class TileTree(TileModel, AliasedDataMixin):
         proxy_resource.save_descriptors()
 
         if index:
-            if (
-                getattr(settings, "EVENTUALLY_CONSISTENT_ES_INDEXING", False)
-                and task_management.check_if_celery_available()
-            ):
-                index_resource.apply_async((self.resourceinstanceid,))
-            else:
-                proxy_resource.index()
+            _index_resource_after_save(proxy_resource)
 
         self.refresh_from_db(
             using=kwargs.get("using", None),
