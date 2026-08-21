@@ -38,7 +38,7 @@ Repository = "https://github.com/archesproject/arches-querysets.git"
 Issues = "https://github.com/archesproject/arches-querysets/issues"
 
 [project.optional-dependencies]
-drf = [ "djangorestframework>=3.16",]
+drf = [ "djangorestframework>=3.18",]
 
 [tool.setuptools.packages.find]
 include = [ "arches_querysets*",]
