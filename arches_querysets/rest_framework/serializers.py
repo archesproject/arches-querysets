@@ -677,6 +677,24 @@ class ArchesTileSerializer(serializers.ModelSerializer, NodeFetcherMixin):
         validated_data["nodegroup_id"] = graph["entry_nodegroup_id"]
         return super().create(validated_data)
 
+    def update(self, instance, validated_data):
+        # Mirrors ArchesResourceSerializer.update(): the default
+        # ModelSerializer.update() calls instance.save() with no arguments,
+        # which drops the real request (and its request.FILES).
+        # TileTree.save() falls back to a synthesized anonymous request in
+        # that case, so uploaded files never get linked via post_tile_save().
+        request = self.context.get("request")
+        aliased_data = validated_data.pop("aliased_data", None)
+
+        for attribute_name, attribute_value in validated_data.items():
+            setattr(instance, attribute_name, attribute_value)
+
+        if aliased_data is not None:
+            instance.aliased_data = aliased_data
+
+        instance.save(request=request)
+        return instance
+
 
 class ArchesSingleNodegroupSerializer(ArchesTileSerializer):
     aliased_data = SingleNodegroupAliasedDataSerializer(
