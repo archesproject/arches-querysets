@@ -29,6 +29,7 @@ class FileListDataType(datatypes.FileListDataType):
         if not languages:  # pragma: no cover
             languages = models.Language.objects.all()
         language = get_language()
+        raw_input_value = value
         # arches == 9.0.0 - remove the stringifieid_list in favor of the 8.1.0 logic
         if arches_version < Version("8.1"):
             original_value = value
@@ -65,19 +66,37 @@ class FileListDataType(datatypes.FileListDataType):
                 value, languages=languages, **kwargs
             )
 
-        # Remove file object created in transform_value_for_tile
-        # after discussion with chiatt, this behavior is only really needed
-        # for the bulk loader (and causes integrity problems/duplicity) -
-        # file will be recreated later in post_tile_save.  Skip this deletion
-        if "bulk_import" not in kwargs and (
-            "is_existing_tile" not in kwargs or not kwargs["is_existing_tile"]
-        ):
-            File.objects.filter(
-                fileid__in=[file["file_id"] for file in new_value]
-            ).delete()
+        # Remove file object created in transform_value_for_tile so that
+        # post_tile_save can recreate it from the actual uploaded binary in
+        # request.FILES, matching by name against an entry with url=None.
+        # Only applies to newly-uploaded entries (no pre-existing file_id) --
+        # entries that already had a file_id were passed through unchanged
+        # above and must keep pointing at their already-saved File record.
+        # Bulk import is excluded because it saves the real file content
+        # directly in transform_value_for_tile, with no later request.FILES
+        # to match against.
+
+        if "bulk_import" not in kwargs:
+            original_items = (
+                raw_input_value
+                if isinstance(raw_input_value, list)
+                else [raw_input_value] if isinstance(raw_input_value, dict) else []
+            )
+            preexisting_file_ids = {
+                item.get("file_id")
+                for item in original_items
+                if isinstance(item, dict) and item.get("file_id")
+            }
+            newly_uploaded_file_ids = [
+                file_dict["file_id"]
+                for file_dict in new_value
+                if file_dict.get("file_id") not in preexisting_file_ids
+            ]
+            File.objects.filter(fileid__in=newly_uploaded_file_ids).delete()
             for file_dict in new_value:
-                file_dict["file_id"] = None
-                file_dict["url"] = None
+                if file_dict.get("file_id") in newly_uploaded_file_ids:
+                    file_dict["file_id"] = None
+                    file_dict["url"] = None
 
         for file_info in new_value:
             for key, val in file_info.items():
