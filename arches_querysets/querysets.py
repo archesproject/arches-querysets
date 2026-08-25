@@ -215,23 +215,22 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
         if resource_ids:
             qs = qs.filter(resourceinstance_id__in=resource_ids)
 
-        if not nodes:
-            # Violates laziness of QuerySets, but can be made fully lazy
-            # by providing a `nodes` argument doing the same query.
+        resolved_nodes = nodes
+        if not resolved_nodes:
             filters = models.Q(graph__slug=graph_slug)
             # arches_version==9.0.0
             if arches_version >= Version("8.0"):
                 filters &= models.Q(source_identifier=None)
-            nodes = (
+            resolved_nodes = (
                 Node.objects.filter(filters)
                 .exclude(datatype="semantic")
                 .exclude(nodegroup=None)
                 .select_related("nodegroup__parentnodegroup")
             )
-            if not nodes:
+            if not resolved_nodes:
                 raise ValueError(f"No nodes found for graph with slug: {graph_slug}")
 
-        alias_expressions = generate_node_alias_expressions(self.model, nodes)
+        alias_expressions = generate_node_alias_expressions(self.model, resolved_nodes)
 
         # arches_version==9.0.0
         if arches_version < Version("8.0"):
@@ -248,6 +247,7 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
             as_representation=as_representation,
             graph_slug=graph_slug,
             graph_query=graph_query,
+            requested_nodes=nodes,
         )
 
         # Future: see various solutions mentioned here for avoiding
@@ -259,7 +259,7 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
                 graph_slug=graph_slug,
                 as_representation=as_representation,
                 depth=depth - 1,
-                nodes=nodes,
+                nodes=resolved_nodes,
                 graph_query=graph_query,
             )
 
@@ -311,6 +311,13 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
         """
         from arches_querysets.models import AliasedData
 
+        requested_nodes = self._hints.get("requested_nodes")
+        requested_node_pks = (
+            {node.pk for node in requested_nodes}
+            if requested_nodes is not None
+            else None
+        )
+
         aliased_data_to_update = {}
         values_by_datatype = defaultdict(list)
         datatype_contexts = {}
@@ -320,7 +327,12 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
             else:
                 return  # already set
             tile.sync_private_attributes(self)
-            for node in tile.nodegroup.node_set.all():
+            nodegroup_nodes = tile.nodegroup.node_set.all()
+            if requested_node_pks is not None:
+                nodegroup_nodes = [
+                    node for node in nodegroup_nodes if node.pk in requested_node_pks
+                ]
+            for node in nodegroup_nodes:
                 if node.datatype == "semantic":
                     continue
                 datatype_instance = DataTypeFactory().get_instance(node.datatype)
