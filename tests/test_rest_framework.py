@@ -1,16 +1,21 @@
+import json
+import tempfile
 import unittest
 import uuid
 from http import HTTPStatus
 from unittest.mock import patch
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
+from django.test import override_settings
+from django.test.client import BOUNDARY, MULTIPART_CONTENT, encode_multipart
 from django.urls import reverse
 from arches import __version__ as _arches_version_str
 from packaging.version import Version
 
 arches_version = Version(_arches_version_str)
 from arches.app.models.graph import Graph
-from arches.app.models.models import EditLog
+from arches.app.models.models import EditLog, File, Node, NodeGroup
 
 from arches_querysets.rest_framework.serializers import (
     ArchesResourceSerializer,
@@ -20,7 +25,6 @@ from arches_querysets.rest_framework.serializers import (
 )
 from arches_querysets.utils.models import ensure_request
 from arches_querysets.utils.tests import GraphTestCase
-
 
 MUTABLE_PERMITTED_NODEGROUPS = set()
 
@@ -909,6 +913,195 @@ class RestFrameworkTests(GraphTestCase):
             "Card-1 child must be fresh in resource PUT update response (n→1)",
         )
 
+    def test_client_supplied_tileid_survives_new_cardinality_n_tile_via_resource_put(
+        self,
+    ):
+        client_tileid = str(uuid.uuid4())
+        parent_tile = self.resource_42.aliased_data.datatypes_1
+        update_url = reverse(
+            "arches_querysets:api-resource",
+            kwargs={"graph": "datatype_lookups", "pk": str(self.resource_42.pk)},
+        )
+        request_body = {
+            "aliased_data": {
+                "datatypes_1": {
+                    "tileid": str(parent_tile.pk),
+                    "resourceinstance": str(self.resource_42.pk),
+                    "aliased_data": {
+                        "datatypes_1_n_child": [
+                            {
+                                "tileid": client_tileid,
+                                "resourceinstance": str(self.resource_42.pk),
+                                "aliased_data": {
+                                    "non_localized_string_alias_1_n_child": "verify_tileid_value"
+                                },
+                            }
+                        ],
+                    },
+                },
+            },
+        }
+        self.client.login(username="dev", password="dev")
+        response = self.client.put(
+            update_url, request_body, content_type="application/json"
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK, response.content)
+
+        def _nv(v):
+            return v["node_value"] if isinstance(v, dict) else v
+
+        new_children = response.json()["aliased_data"]["datatypes_1"]["aliased_data"][
+            "datatypes_1_n_child"
+        ]
+        matching = [
+            child
+            for child in new_children
+            if _nv(child["aliased_data"]["non_localized_string_alias_1_n_child"])
+            == "verify_tileid_value"
+        ]
+        self.assertEqual(len(matching), 1)
+        self.assertEqual(matching[0]["tileid"], client_tileid)
+
+    def test_update_tile_with_new_file_upload_on_existing_tile(self):
+        with override_settings(MEDIA_ROOT=tempfile.mkdtemp()):
+            file_node_id = str(
+                Node.objects.get(graph=self.graph, alias="file_list_alias").pk
+            )
+            pre_existing_file = File.objects.create(path="uploadedfiles/existing.jpg")
+
+            update_url = reverse(
+                "arches_querysets:api-tile",
+                kwargs={
+                    "graph": "datatype_lookups",
+                    "nodegroup_alias": "datatypes_1",
+                    "pk": self.resource_42.aliased_data.datatypes_1.pk,
+                },
+            )
+            request_body = {
+                "aliased_data": {
+                    "file_list_alias": [
+                        {
+                            "name": "existing.jpg",
+                            "file_id": str(pre_existing_file.pk),
+                            "url": f"/files/{pre_existing_file.pk}",
+                        },
+                        {"name": "new_photo.jpg", "type": "image/jpeg"},
+                    ],
+                },
+                "resourceinstance": str(self.resource_42.pk),
+            }
+            encoded_body = encode_multipart(
+                BOUNDARY,
+                {
+                    "json": json.dumps(request_body),
+                    f"file-list_{file_node_id}": SimpleUploadedFile(
+                        "new_photo.jpg", b"fake-image-bytes", content_type="image/jpeg"
+                    ),
+                },
+            )
+
+            self.client.login(username="dev", password="dev")
+            response = self.client.patch(
+                update_url, encoded_body, content_type=MULTIPART_CONTENT
+            )
+
+            self.assertEqual(response.status_code, HTTPStatus.OK, response.content)
+            updated_files = response.json()["aliased_data"]["file_list_alias"][
+                "node_value"
+            ]
+            self.assertEqual(len(updated_files), 2)
+
+            existing_entry = next(
+                file_entry
+                for file_entry in updated_files
+                if file_entry["name"] == "existing.jpg"
+            )
+            new_entry = next(
+                file_entry
+                for file_entry in updated_files
+                if file_entry["name"] == "new_photo.jpg"
+            )
+
+            # The pre-existing entry and its File row are untouched.
+            self.assertEqual(existing_entry["file_id"], str(pre_existing_file.pk))
+            self.assertTrue(File.objects.filter(pk=pre_existing_file.pk).exists())
+
+            # The new upload is linked to a real File row with the uploaded
+            # content, not left pointing at a phantom/nonexistent file.
+            self.assertIsNotNone(new_entry["file_id"])
+            new_file_model = File.objects.get(pk=new_entry["file_id"])
+            self.assertEqual(new_file_model.path.read(), b"fake-image-bytes")
+
+            # No orphans: exactly the pre-existing File row plus the new one.
+            self.assertEqual(File.objects.count(), 2)
+
+    def test_update_tile_removes_file_dropped_from_list(self):
+        with override_settings(MEDIA_ROOT=tempfile.mkdtemp()):
+            kept_file = File.objects.create(path="uploadedfiles/kept.jpg")
+            dropped_file = File.objects.create(path="uploadedfiles/dropped.jpg")
+
+            update_url = reverse(
+                "arches_querysets:api-tile",
+                kwargs={
+                    "graph": "datatype_lookups",
+                    "nodegroup_alias": "datatypes_1",
+                    "pk": self.resource_42.aliased_data.datatypes_1.pk,
+                },
+            )
+            self.client.login(username="dev", password="dev")
+
+            # Establish real, persisted tile state with two files.
+            seed_body = {
+                "aliased_data": {
+                    "file_list_alias": [
+                        {
+                            "name": "kept.jpg",
+                            "file_id": str(kept_file.pk),
+                            "url": f"/files/{kept_file.pk}",
+                        },
+                        {
+                            "name": "dropped.jpg",
+                            "file_id": str(dropped_file.pk),
+                            "url": f"/files/{dropped_file.pk}",
+                        },
+                    ],
+                },
+                "resourceinstance": str(self.resource_42.pk),
+            }
+            seed_response = self.client.patch(
+                update_url, seed_body, content_type="application/json"
+            )
+            self.assertEqual(
+                seed_response.status_code, HTTPStatus.OK, seed_response.content
+            )
+
+            # Drop dropped.jpg from the list.
+            update_body = {
+                "aliased_data": {
+                    "file_list_alias": [
+                        {
+                            "name": "kept.jpg",
+                            "file_id": str(kept_file.pk),
+                            "url": f"/files/{kept_file.pk}",
+                        },
+                    ],
+                },
+                "resourceinstance": str(self.resource_42.pk),
+            }
+            response = self.client.patch(
+                update_url, update_body, content_type="application/json"
+            )
+            self.assertEqual(response.status_code, HTTPStatus.OK, response.content)
+
+            updated_files = response.json()["aliased_data"]["file_list_alias"][
+                "node_value"
+            ]
+            self.assertEqual(len(updated_files), 1)
+            self.assertEqual(updated_files[0]["name"], "kept.jpg")
+
+            self.assertTrue(File.objects.filter(pk=kept_file.pk).exists())
+            self.assertFalse(File.objects.filter(pk=dropped_file.pk).exists())
+
     @unittest.skipIf(arches_version < Version("8.0"), reason="Arches 8+ only logic")
     def test_out_of_date_resource(self):
         Graph.objects.get(pk=self.graph.pk).publish(user=None)
@@ -1180,14 +1373,14 @@ class RestFrameworkPerformanceTests(GraphTestCase):
         # 17: resource count (paginator)
         # 18: select resources limit 500
         # 19: tile depth 1
-        # 20: resourcexresource depth 1
-        # 21: tile depth 2
-        # 22: resourcexresource depth 2
-        # 23: tile depth 3: none!
-        # 24-26: arches perms (BUG: core arches)
-        num_queries = 26
+        # 20: tile depth 2
+        # 21: tile depth 3: none!
+        # 22-25: arches perms (BUG: core arches)
+        num_queries = 25
         if arches_version < Version("8.1.0a0"):
             num_queries += 1  # extra user profile query on Arches 8.0 and below.
+        if arches_version < Version("8.2.0a8"):
+            num_queries += 1  # extra django-guardian query below 3.3.2.
         with self.assertNumQueries(num_queries):
             response = self.client.get(
                 reverse(
@@ -1210,14 +1403,14 @@ class RestFrameworkPerformanceTests(GraphTestCase):
         # 4-16: PerformanceTests.test_get_graph_objects()
         # 17: tile count (paginator)
         # 18: select tiles limit 500
-        # 19: resourcexresource depth 1
-        # 20: tile depth 2
-        # 21: resourcexresource depth 2
-        # 22: tile depth 3: none!
-        # 23-25: arches perms (BUG: core arches)
-        num_queries = 25
+        # 19: tile depth 2
+        # 20: tile depth 3: none!
+        # 21-24: arches perms (BUG: core arches)
+        num_queries = 24
         if arches_version < Version("8.1.0a0"):
             num_queries += 1  # extra user profile query on Arches 8.0 and below.
+        if arches_version < Version("8.2.0a8"):
+            num_queries += 1  # extra django-guardian query below 3.3.2.
         with self.assertNumQueries(num_queries):
             response = self.client.get(
                 reverse(
@@ -1237,12 +1430,14 @@ class RestFrameworkPerformanceTests(GraphTestCase):
         self.assertIsNone(top_tile["aliased_data"]["number_alias"]["node_value"])
 
     def test_resource_blank_view_performance(self):
-        # 1-5: perms
-        # 6: get_nodegroup_alias_lookup()
-        # 7-11: NodeFetcherMixin._find_graph_nodes()
-        num_queries = 11
+        # 1-4: perms
+        # 5: get_nodegroup_alias_lookup()
+        # 6-10: NodeFetcherMixin._find_graph_nodes()
+        num_queries = 10
         if arches_version < Version("8.1.0a0"):
             num_queries += 1  # extra user profile query on Arches 8.0 and below.
+        if arches_version < Version("8.2.0a8"):
+            num_queries += 1  # extra django-guardian query below 3.3.2.
         with self.assertNumQueries(num_queries):
             response = self.client.get(
                 reverse(
