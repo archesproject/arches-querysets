@@ -311,12 +311,8 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
         """
         from arches_querysets.models import AliasedData
 
-        requested_nodes = self._hints.get("nodes")
-        requested_node_pks = (
-            {node.pk for node in requested_nodes}
-            if requested_nodes is not None
-            else None
-        )
+        nodes = self._hints.get("nodes")
+        node_pks = {node.pk for node in nodes} if nodes is not None else None
 
         aliased_data_to_update = {}
         values_by_datatype = defaultdict(list)
@@ -328,9 +324,9 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
                 return  # already set
             tile.sync_private_attributes(self)
             nodegroup_nodes = tile.nodegroup.node_set.all()
-            if requested_node_pks is not None:
+            if node_pks is not None:
                 nodegroup_nodes = [
-                    node for node in nodegroup_nodes if node.pk in requested_node_pks
+                    node for node in nodegroup_nodes if node.pk in node_pks
                 ]
             for node in nodegroup_nodes:
                 if node.datatype == "semantic":
