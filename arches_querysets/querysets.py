@@ -247,7 +247,7 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
             as_representation=as_representation,
             graph_slug=graph_slug,
             graph_query=graph_query,
-            requested_nodes=nodes,
+            nodes=nodes,
         )
 
         # Future: see various solutions mentioned here for avoiding
@@ -311,7 +311,7 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
         """
         from arches_querysets.models import AliasedData
 
-        requested_nodes = self._hints.get("requested_nodes")
+        requested_nodes = self._hints.get("nodes")
         requested_node_pks = (
             {node.pk for node in requested_nodes}
             if requested_nodes is not None
