@@ -5,12 +5,17 @@ See arches_querysets.datatypes.resource_types.ResourceInstanceDataType.
 python manage.py test tests.test_related_resource_permissions --settings="tests.test_settings"
 """
 
+import unittest
 import uuid
 from contextlib import contextmanager
 
 from django.contrib.auth.models import User
 from django.test import TestCase
 
+from arches import __version__ as _arches_version_str
+from packaging.version import Version
+
+arches_version = Version(_arches_version_str)
 from arches.app.models.models import (
     GraphModel,
     Node,
@@ -77,6 +82,20 @@ def _related_resource_link(target):
     }
 
 
+def _link_resources(from_resource, to_resource):
+    # arches_version==9.0.0
+    if arches_version < Version("8.0"):
+        from_resource_attr = "resourceinstanceidfrom"
+        to_resource_attr = "resourceinstanceidto"
+    else:
+        from_resource_attr = "from_resource"
+        to_resource_attr = "to_resource"
+    return ResourceXResource.objects.create(
+        resourcexid=uuid.uuid4(),
+        **{from_resource_attr: from_resource, to_resource_attr: to_resource},
+    )
+
+
 class RelatedResourcePermissionFilteringTests(TestCase):
     def setUp(self):
         cm = _permission_framework(
@@ -95,8 +114,11 @@ class RelatedResourcePermissionFilteringTests(TestCase):
             graphid=uuid.uuid4(),
             slug="related-resource-permissions-graph",
             isresource=True,
-            is_active=True,
         )
+        # arches_version==9.0.0
+        if arches_version >= Version("8.0"):
+            cls.graph.is_active = True
+            cls.graph.save()
 
         cls.related_list_nodegroup, cls.related_list_node = _make_nodegroup_and_node(
             cls.graph, "related_list", "resource-instance-list"
@@ -156,9 +178,7 @@ class RelatedResourcePermissionFilteringTests(TestCase):
             },
         )
         for target in (cls.readable_target, cls.unreadable_target):
-            ResourceXResource.objects.create(
-                from_resource=cls.resource, to_resource=target
-            )
+            _link_resources(cls.resource, target)
 
     def _get_value(self, node, *, user):
         tiles = TileTree.objects.get_tiles(
@@ -172,6 +192,10 @@ class RelatedResourcePermissionFilteringTests(TestCase):
         )
         return getattr(tiles.get().aliased_data, node.alias)
 
+    @unittest.skipIf(
+        arches_version < Version("8.2.0a9"),
+        reason="permission_backend.filter_resource_queryset() unavailable before this version",
+    )
     def test_list_datatype_omits_unpermitted_related_resource(self):
         value = self._get_value(self.related_list_node, user=self.user)
 
@@ -197,6 +221,10 @@ class RelatedResourcePermissionFilteringTests(TestCase):
         )
         self.assertEqual(missing_detail["display_value"], "Missing")
 
+    @unittest.skipIf(
+        arches_version < Version("8.2.0a9"),
+        reason="permission_backend.filter_resource_queryset() unavailable before this version",
+    )
     def test_single_datatype_omits_unpermitted_related_resource(self):
         value = self._get_value(self.related_single_node, user=self.user)
         self.assertEqual(value["details"], [])
@@ -231,8 +259,11 @@ class DefaultAllowFrameworkFallbackTests(TestCase):
             graphid=uuid.uuid4(),
             slug="default-allow-fallback-graph",
             isresource=True,
-            is_active=True,
         )
+        # arches_version==9.0.0
+        if arches_version >= Version("8.0"):
+            cls.graph.is_active = True
+            cls.graph.save()
         cls.related_nodegroup, cls.related_node = _make_nodegroup_and_node(
             cls.graph, "related", "resource-instance"
         )
@@ -251,9 +282,7 @@ class DefaultAllowFrameworkFallbackTests(TestCase):
             cls.resource,
             {str(cls.related_node.nodeid): [_related_resource_link(cls.target)]},
         )
-        ResourceXResource.objects.create(
-            from_resource=cls.resource, to_resource=cls.target
-        )
+        _link_resources(cls.resource, cls.target)
 
     def test_user_provided_does_not_crash_and_applies_no_filtering(self):
         tiles = TileTree.objects.get_tiles(

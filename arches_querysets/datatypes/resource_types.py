@@ -218,6 +218,9 @@ class ResourceInstanceDataType(datatypes.ResourceInstanceDataType):
         subset of related_resources' primary keys the user is permitted to view."""
         if user is None or not related_resources:
             return None
+        # arches_version==9.0.0: filter_resource_queryset() is unavailable below this
+        if arches_version < Version("8.2.0a9"):
+            return None
         try:
             permitted_queryset = permission_backend.filter_resource_queryset(
                 user,
