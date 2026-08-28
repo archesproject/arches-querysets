@@ -8,6 +8,7 @@ from arches import __version__ as _arches_version_str
 from packaging.version import Version
 
 arches_version = Version(_arches_version_str)
+from arches.app.models.fields.i18n import I18n_JSON
 from arches.app.models.graph import Graph
 from arches.app.models.models import (
     CardModel,
@@ -37,7 +38,7 @@ class GraphTestCase(TestCase):
         cls.create_edges()
         cls.create_cards()
         cls.create_widgets()
-        cls.add_default_values_for_widgets()
+        cls.add_default_values_for_nodes()
         cls.create_resources()
         cls.create_tiles_with_data()
         cls.create_tiles_with_none()
@@ -227,10 +228,8 @@ class GraphTestCase(TestCase):
         CardXNodeXWidget.objects.bulk_create(node_widgets)
 
     @classmethod
-    def add_default_values_for_widgets(cls):
-        node_widgets = CardXNodeXWidget.objects.filter(
-            node__graph=cls.graph,
-        ).select_related("node")
+    def add_default_values_for_nodes(cls):
+        nodes = Node.objects.filter(graph=cls.graph)
         cls.default_vals_by_nodeid = {}
         cls.default_vals_by_datatype = {
             "non-localized-string": "The answer to life, the universe, and everything.",
@@ -253,29 +252,21 @@ class GraphTestCase(TestCase):
             # "concept": None,
             # "concept-list": [],
         }
-        for widget in node_widgets:
-            if widget.node.datatype in cls.default_vals_by_datatype:
-                widget.config["defaultValue"] = cls.default_vals_by_datatype[
-                    widget.node.datatype
-                ]
-                cls.default_vals_by_nodeid[str(widget.node.pk)] = (
-                    cls.default_vals_by_datatype[widget.node.datatype]
-                )
+        for node in nodes:
+            if node.datatype in cls.default_vals_by_datatype:
+                default_value = cls.default_vals_by_datatype[node.datatype]
+                if node.config is None:
+                    node.config = I18n_JSON()
+                node.config["defaultValue"] = default_value
+                cls.default_vals_by_nodeid[str(node.pk)] = default_value
             else:
-                for datatype in cls.datatypes:
-                    if datatype.pk == widget.node.datatype:
-                        nodeid = str(widget.node.pk)
-                        config = datatype.defaultwidget.defaultconfig
-                        cls.default_vals_by_nodeid[nodeid] = config.get("defaultValue")
-                        break
-                else:
-                    raise RuntimeError("Missing datatype")
+                cls.default_vals_by_nodeid[str(node.pk)] = None
             # arches_version==9.0.0
             if arches_version < Version("8.0"):
-                widget.save()
+                node.save()
         # arches_version==9.0.0
         if arches_version >= Version("8.0"):
-            CardXNodeXWidget.objects.bulk_update(node_widgets, ["config"])
+            Node.objects.bulk_update(nodes, ["config"])
 
     @classmethod
     def create_resources(cls):

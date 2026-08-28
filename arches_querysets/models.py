@@ -868,16 +868,8 @@ class TileTree(TileModel, AliasedDataMixin):
 
     @staticmethod
     def get_default_value(node):
-        datatype_factory = DataTypeFactory()
         # TODO: When ingesting this into core, make this a method on the node.
-        try:
-            widget_config = node.cardxnodexwidget_set.all()[0].config
-            localized_config = widget_config.serialize()
-        except (IndexError, ObjectDoesNotExist, MultipleObjectsReturned):
-            d_data_type = datatype_factory.datatypes[node.datatype]
-            default_widget = d_data_type.defaultwidget
-            localized_config = default_widget.defaultconfig
-        default_value = localized_config.get("defaultValue")
+        default_value = (node.config or {}).get("defaultValue")
         return TileTree.get_cleaned_default_value(node, default_value)
 
     @staticmethod
