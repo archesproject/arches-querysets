@@ -8,6 +8,7 @@ from packaging.version import Version
 arches_version = Version(_arches_version_str)
 from arches.app.datatypes import datatypes
 from arches.app.models import models
+from arches.app.utils import permission_backend
 
 from django.core.cache import caches
 
@@ -16,6 +17,10 @@ from django.utils.translation import get_language
 from django.utils.translation import gettext as _
 
 logger = logging.getLogger(__name__)
+
+# These two datatypes name a different resource than the one being displayed
+# which is why they need permission filtering applied to the resources they point at.
+RESOURCE_INSTANCE_DATATYPES = ("resource-instance", "resource-instance-list")
 
 
 class ResourceInstanceDataType(datatypes.ResourceInstanceDataType):
@@ -65,7 +70,8 @@ class ResourceInstanceDataType(datatypes.ResourceInstanceDataType):
             data = self.get_tile_data(tile)
             value = data.get(str(node.nodeid))
             resource = self.get_resource(tile)
-            details = self.get_details(value, resource=resource)
+            user = getattr(tile, "_user", None)
+            details = self.get_details(value, resource=resource, user=user)
         return ", ".join(
             [detail["display_value"] or "" for detail in details if detail]
         )
@@ -164,36 +170,79 @@ class ResourceInstanceDataType(datatypes.ResourceInstanceDataType):
 
         return related_resources
 
-    def get_details(self, value, *, resource=None, **kwargs):
+    def get_details(self, value, *, resource=None, user=None, **kwargs):
         lang = get_language()
+        related_resources = self.get_related_resources(value, resource)
         related_resources_by_id = {
             related_resource.pk: related_resource
-            for related_resource in self.get_related_resources(value, resource)
+            for related_resource in related_resources
         }
+        permitted_resource_ids = self._get_permitted_related_resource_ids(
+            related_resources, user
+        )
         ret = []
         for inner_val in value or []:
             if not inner_val:
                 continue
-            if related := related_resources_by_id.get(
-                uuid.UUID(inner_val["resourceId"]), None
-            ):
-                descriptor = related.descriptors.get(lang) or next(
-                    iter(related.descriptors.values()), None
-                )
-                ret.append(
-                    {
-                        "resource_id": str(related.pk),
-                        "display_value": descriptor["name"] if descriptor else "",
-                    }
-                )
-            else:
+            target_resource_id = uuid.UUID(inner_val["resourceId"])
+            related = related_resources_by_id.get(target_resource_id)
+            if related is None:
                 ret.append(
                     {
                         "resource_id": None,
                         "display_value": _("Missing"),
                     }
                 )
+                continue
+            if (
+                permitted_resource_ids is not None
+                and target_resource_id not in permitted_resource_ids
+            ):
+                # The user can't view this related resource: omit it entirely
+                # rather than revealing its existence or name.
+                continue
+            descriptor = related.descriptors.get(lang) or next(
+                iter(related.descriptors.values()), None
+            )
+            ret.append(
+                {
+                    "resource_id": str(related.pk),
+                    "display_value": descriptor["name"] if descriptor else "",
+                }
+            )
         return ret
+
+    @staticmethod
+    def _get_permitted_related_resource_ids(related_resources, user):
+        """Returns None (no filtering) when user is not provided, otherwise the
+        subset of related_resources' primary keys the user is permitted to view."""
+        if user is None or not related_resources:
+            return None
+        # arches_version==9.0.0: filter_resource_queryset() is unavailable below this
+        if arches_version < Version("8.2.0a9"):
+            return None
+        try:
+            permitted_queryset = permission_backend.filter_resource_queryset(
+                user,
+                models.ResourceInstance.objects.filter(
+                    pk__in=[
+                        related_resource.pk for related_resource in related_resources
+                    ]
+                ),
+            )
+        except Exception:
+            # Some permission frameworks (e.g. the deprecated default-allow
+            # framework) don't support filtering an arbitrary queryset by
+            # per-object view permission. Treat that as "no filtering" rather
+            # than raising, since default-allow already grants broad read
+            # access by design.
+            logger.warning(
+                "Active permission framework doesn't support filtering "
+                "related resources by view permission; skipping that check.",
+                exc_info=True,
+            )
+            return None
+        return set(permitted_queryset.values_list("resourceinstanceid", flat=True))
 
     @staticmethod
     def from_id_string(uuid_string, graph_config=None):
@@ -225,19 +274,39 @@ class ResourceInstanceListDataType(ResourceInstanceDataType):
             return None
         return related_resources
 
-    def get_details(self, value, *, resource=None, **kwargs):
+    def get_details(self, value, *, resource=None, user=None, **kwargs):
         if not value:
             return []
-        details = super().get_details(value=value, resource=resource, **kwargs)
+        details = super().get_details(
+            value=value, resource=resource, user=user, **kwargs
+        )
         resource_display_value_map = {
             str(detail["resource_id"]): detail["display_value"] for detail in details
         }
-        return [
-            {
-                "resource_id": resource_dict["resourceId"],
-                "display_value": resource_display_value_map.get(
-                    resource_dict["resourceId"], _("Missing")
-                ),
-            }
-            for resource_dict in value
-        ]
+        related_resources = self.get_related_resources(value, resource)
+        permitted_resource_ids = self._get_permitted_related_resource_ids(
+            related_resources, user
+        )
+        resolved_resource_ids = {
+            related_resource.pk for related_resource in related_resources
+        }
+        ret = []
+        for resource_dict in value:
+            target_resource_id = uuid.UUID(resource_dict["resourceId"])
+            if (
+                permitted_resource_ids is not None
+                and target_resource_id in resolved_resource_ids
+                and target_resource_id not in permitted_resource_ids
+            ):
+                # The user can't view this related resource: omit it entirely
+                # rather than revealing its existence or name.
+                continue
+            ret.append(
+                {
+                    "resource_id": resource_dict["resourceId"],
+                    "display_value": resource_display_value_map.get(
+                        resource_dict["resourceId"], _("Missing")
+                    ),
+                }
+            )
+        return ret
