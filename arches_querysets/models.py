@@ -25,6 +25,7 @@ from arches.app.utils.permission_backend import user_is_resource_reviewer
 
 from arches_querysets.bulk_operations.tiles import TileTreeOperation
 from arches_querysets.datatypes.datatypes import DataTypeFactory
+from arches_querysets.datatypes.resource_types import RESOURCE_INSTANCE_DATATYPES
 from arches_querysets.lookups import *  # registers lookups
 from arches_querysets.querysets import (
     GraphWithPrefetchingQuerySet,
@@ -200,6 +201,7 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
         as_representation=False,
         nodes=None,
         graph_query=None,
+        user=None,
     ):
         """Return a chainable QuerySet for a requested graph's instances,
         with tile data keyed by node and nodegroup aliases.
@@ -212,6 +214,7 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
             as_representation=as_representation,
             nodes=nodes,
             graph_query=graph_query,
+            user=user,
         )
 
     def append_tile(self, nodegroup_alias):
@@ -639,6 +642,7 @@ class TileTree(TileModel, AliasedDataMixin):
         as_representation=False,
         nodes=None,
         depth=20,
+        user=None,
     ):
         """See `arches_querysets.querysets.TileTreeQuerySet.get_tiles`."""
         return cls.objects.get_tiles(
@@ -648,6 +652,7 @@ class TileTree(TileModel, AliasedDataMixin):
             as_representation=as_representation,
             nodes=nodes,
             depth=depth,
+            user=user,
         )
 
     def serialize(self, **kwargs):
@@ -897,9 +902,12 @@ class TileTree(TileModel, AliasedDataMixin):
 
         return cleaned_default
 
-    def get_value_with_context(self, node, node_value, datatype_contexts=None):
+    def get_value_with_context(
+        self, node, node_value, datatype_contexts=None, user=None
+    ):
         datatype_instance = DataTypeFactory().get_instance(node.datatype)
         empty_display_values = (None, "", '{"url": "", "url_label": ""}')
+        self._user = user
         compiled_json = datatype_instance.to_json(self, node)
         if datatype_contexts is None:
             datatype_contexts = {}
@@ -912,6 +920,7 @@ class TileTree(TileModel, AliasedDataMixin):
                 # An optional extra hint for the ResourceInstance{list} types
                 # so that prefetched related resources can be used.
                 resource=self.resourceinstance if self.resourceinstance_id else None,
+                user=user,
             ),
         }
         if ret["details"] is None:
@@ -919,16 +928,29 @@ class TileTree(TileModel, AliasedDataMixin):
         if ret["display_value"] in empty_display_values:
             # Future: upstream this into datatype methods (another hook?)
             ret["display_value"] = ""
+        if user is not None and node.datatype in RESOURCE_INSTANCE_DATATYPES:
+            # get_details() already dropped unpermitted related resources;
+            # keep node_value in sync so it doesn't leak their raw resourceIds.
+            permitted_resource_ids = {
+                detail["resource_id"]
+                for detail in ret["details"]
+                if detail.get("resource_id")
+            }
+            ret["node_value"] = [
+                inner_val
+                for inner_val in node_value or []
+                if inner_val and inner_val.get("resourceId") in permitted_resource_ids
+            ]
         return ret
 
-    def set_aliased_data(self, node, node_value, datatype_contexts=None):
+    def set_aliased_data(self, node, node_value, datatype_contexts=None, user=None):
         """Format node_value according to the self._as_representation flag and
         set it on self.aliased_data."""
         datatype_instance = DataTypeFactory().get_instance(node.datatype)
 
         if self._as_representation:
             final_val = self.get_value_with_context(
-                node, node_value, datatype_contexts=datatype_contexts
+                node, node_value, datatype_contexts=datatype_contexts, user=user
             )
         else:
             if hasattr(datatype_instance, "to_python"):

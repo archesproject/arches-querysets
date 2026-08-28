@@ -183,6 +183,7 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
         depth=20,
         nodes=None,
         graph_query=None,
+        user=None,
     ):
         """
         Entry point for filtering arches data by nodegroups.
@@ -248,6 +249,7 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
             as_representation=as_representation,
             graph_slug=graph_slug,
             graph_query=graph_query,
+            user=user,
         )
 
         # Future: see various solutions mentioned here for avoiding
@@ -261,6 +263,7 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
                 depth=depth - 1,
                 nodes=nodes,
                 graph_query=graph_query,
+                user=user,
             )
 
             qs = qs.prefetch_related(
@@ -311,6 +314,7 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
         """
         from arches_querysets.models import AliasedData
 
+        user = self._hints.get("user")
         aliased_data_to_update = {}
         values_by_datatype = defaultdict(list)
         datatype_contexts = {}
@@ -343,7 +347,7 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
         # Set aliased_data property.
         for tile_node_pair, node_value in aliased_data_to_update.items():
             tile, node = tile_node_pair
-            tile.set_aliased_data(node, node_value, datatype_contexts)
+            tile.set_aliased_data(node, node_value, datatype_contexts, user=user)
 
         for tile in self._result_cache:
             self._set_child_tile_data(tile)
@@ -425,6 +429,7 @@ class ResourceTileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
         nodes=None,
         depth=20,
         graph_query=None,
+        user=None,
     ):
         """Aliases a ResourceTileTreeQuerySet with tile data unpacked
         and mapped onto nodegroup aliases, e.g.:
@@ -476,7 +481,9 @@ class ResourceTileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
 
         if graph_query is None:
             graph_query = GraphWithPrefetching.objects.prefetch(graph_slug)
-        self._add_hints(as_representation=as_representation, graph_query=graph_query)
+        self._add_hints(
+            as_representation=as_representation, graph_query=graph_query, user=user
+        )
 
         if not nodes:
             # Violates laziness of QuerySets, but can be made fully lazy
@@ -517,6 +524,7 @@ class ResourceTileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
                         nodes=nodes,
                         graph_query=graph_query,
                         depth=depth,
+                        user=user,
                     ).filter(parenttile=None),
                     to_attr="_tile_trees",
                 ),
