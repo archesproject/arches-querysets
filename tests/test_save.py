@@ -1,5 +1,6 @@
 import copy
 from uuid import uuid4
+from arches.app.models.graph import Graph
 from arches.app.models.models import EditLog, TileModel
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
@@ -66,6 +67,59 @@ class SaveTileTests(GraphTestCase):
         # Save should stock defaults
         self.resource_42.aliased_data.datatypes_1.save(force_admin=True)
         self.assert_default_values_present(self.resource_42)
+
+    def test_existing_tile_save_with_fill_blanks_true_applies_defaults_to_none(self):
+        node = next(node for node in self.data_nodes if node.alias == "number_alias")
+        default_value = self.default_vals_by_nodeid[str(node.pk)]
+        expected = TileTree.get_cleaned_default_value(node, default_value)
+
+        tile = self.resource_42.aliased_data.datatypes_1
+        tile.aliased_data.number_alias = None
+
+        with self.subTest("without fill_blanks, explicit None is preserved as-is"):
+            tile.save(force_admin=True)
+            self.assertIsNone(tile.aliased_data.number_alias["node_value"])
+
+        with self.subTest(
+            "with fill_blanks=true, but node not required, "
+            "explicit None is still preserved as-is"
+        ):
+            tile.aliased_data.number_alias = None
+            request = ensure_request(None, True)
+            request.GET["fill_blanks"] = "true"
+            tile.save(request=request, force_admin=True)
+            self.assertIsNone(tile.aliased_data.number_alias["node_value"])
+
+        with self.subTest(
+            "with fill_blanks=true and node required, "
+            "explicit None gets the node's default value"
+        ):
+            node.isrequired = True
+            node.save()
+            tile.aliased_data.number_alias = None
+            tile.save(request=request, force_admin=True)
+            self.assertEqual(tile.aliased_data.number_alias["node_value"], expected)
+
+        with self.subTest(
+            "with fill_blanks=true and node required but with no default "
+            "value configured, save raises"
+        ):
+            no_default_node = next(
+                node for node in self.data_nodes if node.alias == "resource_instance_alias"
+            )
+            self.assertIsNone(
+                self.default_vals_by_nodeid[str(no_default_node.pk)]
+            )
+            no_default_node.isrequired = True
+            no_default_node.save()
+            # check_for_missing_nodes() reads isrequired off the published
+            # graph, not the live node, so the graph must be republished.
+            graph_proxy = Graph.objects.get(pk=self.graph.pk)
+            graph_proxy.publish(user=None)
+
+            tile.aliased_data.resource_instance_alias = None
+            with self.assertRaises(ValidationError):
+                tile.save(request=request, force_admin=True)
 
     def test_save_new_tile_provisional(self):
         tile = self.resource_none.aliased_data.datatypes_1

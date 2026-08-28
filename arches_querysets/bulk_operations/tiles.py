@@ -50,6 +50,7 @@ class TileTreeOperation:
         self.languages = Language.objects.all()
         self.request = request
         self.partial = partial
+        self.fill_blanks = request.GET.get("fill_blanks", False) == "true"
         self.save_kwargs = save_kwargs or {}
         self.transaction_id = uuid.uuid4()
         # arches==9.0.0, replace these attributes by simply reading from
@@ -463,6 +464,12 @@ class TileTreeOperation:
                 value_to_validate = value_to_validate.get(
                     "node_value", value_to_validate
                 )
+
+            if value_to_validate is None and self.fill_blanks and node.isrequired:
+                default_value = TileTree.get_default_value(node)
+                if default_value is not None:
+                    value_to_validate = default_value
+                    tile._incoming_tile.set_aliased_data(node, value_to_validate)
 
             self._run_datatype_methods(tile, value_to_validate, node)
 
