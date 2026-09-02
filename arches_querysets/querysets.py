@@ -202,6 +202,15 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
         as_representation:
             - True: calls to_json() datatype methods
             - False: calls to_python() datatype methods
+
+        nodes:
+            An explicit node queryset/sequence to use instead of querying every
+            node on the graph. Supplying it keeps this method lazy, and also
+            scopes decoding: only the given nodes are set on each tile's
+            aliased_data, so a caller asking for a subset does not pay to decode
+            every sibling node in the nodegroup. Tiles then have no attribute
+            for an unlisted node -- pass every node whose value you intend to
+            read.
         """
         from arches_querysets.models import GraphWithPrefetching
 
@@ -488,7 +497,9 @@ class ResourceTileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
 
         if not nodes:
             # Violates laziness of QuerySets, but can be made fully lazy
-            # by providing a `nodes` argument doing the same query.
+            # by providing a `nodes` argument doing the same query. That
+            # argument is forwarded to TileTree.objects.get_tiles() below, so
+            # it also scopes which nodes are decoded onto each tile.
             filters = models.Q(graph__slug=graph_slug)
             # arches_version==9.0.0
             if arches_version >= Version("8.0"):
