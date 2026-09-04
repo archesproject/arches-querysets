@@ -1,6 +1,8 @@
 import copy
+from unittest.mock import patch
 from uuid import uuid4
 from arches.app.models.models import EditLog, TileModel
+from arches.app.models.resource import Resource
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
@@ -244,3 +246,49 @@ class SaveTileTests(GraphTestCase):
             log_entry.newvalue,
             "old_value and new_value must differ in the edit log",
         )
+
+
+class IndexingFailureTests(GraphTestCase):
+    """A failure to index must not fail a write that already committed.
+
+    The tile transaction uses durable=True, so by the time indexing runs the
+    write cannot be rolled back. Raising would only surface a 500 for data that
+    was in fact saved, prompting clients to retry and duplicate it.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.resource_42.graph_publication_id = cls.graph.publication_id
+
+    def test_tile_save_survives_indexing_failure(self):
+        tile = TileTree.get_tiles("datatype_lookups", "datatypes_1").get(
+            pk=self.cardinality_1_tile.pk
+        )
+        tile.aliased_data.non_localized_string_alias = "written despite bad index"
+
+        with patch.object(
+            Resource, "index", side_effect=Exception("simulated ES outage")
+        ) as mocked_index:
+            with self.assertLogs("arches_querysets.models", level="ERROR"):
+                tile.save(force_admin=True)
+
+        self.assertTrue(mocked_index.called)
+        node_id_str = str(self.non_localized_string_node_1.pk)
+        self.assertEqual(
+            TileModel.objects.get(pk=tile.pk).data[node_id_str],
+            "written despite bad index",
+            "the tile must remain saved even though indexing failed",
+        )
+
+    def test_resource_save_survives_indexing_failure(self):
+        resource = ResourceTileTree.get_tiles("datatype_lookups").get(
+            pk=self.resource_42.pk
+        )
+        resource.graph_publication_id = self.graph.publication_id
+
+        with patch.object(
+            Resource, "index", side_effect=Exception("simulated ES outage")
+        ):
+            with self.assertLogs("arches_querysets.models", level="ERROR"):
+                resource.save(force_admin=True)
