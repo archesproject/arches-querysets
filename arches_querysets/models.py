@@ -200,6 +200,7 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
         as_representation=False,
         nodes=None,
         graph_query=None,
+        provisional_edits_for_user=None,
     ):
         """Return a chainable QuerySet for a requested graph's instances,
         with tile data keyed by node and nodegroup aliases.
@@ -212,6 +213,7 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
             as_representation=as_representation,
             nodes=nodes,
             graph_query=graph_query,
+            provisional_edits_for_user=provisional_edits_for_user,
         )
 
     def append_tile(self, nodegroup_alias):
@@ -547,6 +549,7 @@ class TileTree(TileModel, AliasedDataMixin):
     def __init__(self, *args, **kwargs):
         self._as_representation = kwargs.pop("__as_representation", False)
         self._request = kwargs.pop("__request", None)
+        self._provisional_edits_for_user = None
         arches_model_kwargs, other_kwargs = pop_arches_model_kwargs(
             kwargs, self._meta.get_fields()
         )
@@ -639,6 +642,7 @@ class TileTree(TileModel, AliasedDataMixin):
         as_representation=False,
         nodes=None,
         depth=20,
+        provisional_edits_for_user=None,
     ):
         """See `arches_querysets.querysets.TileTreeQuerySet.get_tiles`."""
         return cls.objects.get_tiles(
@@ -648,6 +652,7 @@ class TileTree(TileModel, AliasedDataMixin):
             as_representation=as_representation,
             nodes=nodes,
             depth=depth,
+            provisional_edits_for_user=provisional_edits_for_user,
         )
 
     def serialize(self, **kwargs):
@@ -736,8 +741,14 @@ class TileTree(TileModel, AliasedDataMixin):
     def sync_private_attributes(self, source):
         if isinstance(source, models.QuerySet):
             self._as_representation = source._hints.get("as_representation", False)
+            self._provisional_edits_for_user = source._hints.get(
+                "provisional_edits_for_user", None
+            )
         else:
             self._as_representation = source._as_representation
+            self._provisional_edits_for_user = getattr(
+                source, "_provisional_edits_for_user", None
+            )
 
     def append_tile(self, nodegroup_alias):
         grouping_node_aliases = {
