@@ -42,6 +42,7 @@ class MetadataWithWidgetConfig(SimpleMetadata):
 
 class ArchesModelAPIMixin:
     metadata_class = MetadataWithWidgetConfig
+    provisional_edits = False
 
     def setup(self, request, *args, **kwargs):
         options = self.serializer_class.Meta
@@ -70,12 +71,16 @@ class ArchesModelAPIMixin:
 
     def get_queryset(self):
         options = self.serializer_class.Meta
+        provisional_edits_for_user = (
+            self.request.user if self.provisional_edits else None
+        )
         try:
             if issubclass(options.model, ResourceInstance):
                 qs = options.model.get_tiles(
                     self.graph_slug,
                     resource_ids=self.resource_ids,
                     as_representation=True,
+                    provisional_edits_for_user=provisional_edits_for_user,
                 ).select_related("graph")
                 if arches_version >= Version("8.0"):
                     qs = qs.select_related("resource_instance_lifecycle_state")
@@ -85,6 +90,7 @@ class ArchesModelAPIMixin:
                     self.nodegroup_alias,
                     as_representation=True,
                     resource_ids=self.resource_ids,
+                    provisional_edits_for_user=provisional_edits_for_user,
                 ).select_related("nodegroup", "resourceinstance__graph")
                 if self.resource_ids:
                     qs = qs.filter(resourceinstance__in=self.resource_ids)
