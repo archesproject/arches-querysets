@@ -180,8 +180,15 @@ class ArchesModelAPIMixin:
         # EVENTUALLY_CONSISTENT_ES_INDEXING is not enabled but sync indexing is
         # the primary cause of slow PUT/PATCH responses.
         index = self.request.GET.get("index", "true").lower() != "false"
+        provisional_edits_for_user = (
+            self.request.user if self.provisional_edits else None
+        )
         ret.save = partial(
-            ret.save, request=self.request, partial=is_partial_update, index=index
+            ret.save,
+            request=self.request,
+            partial=is_partial_update,
+            index=index,
+            provisional_edits_for_user=provisional_edits_for_user,
         )
 
         if fill_blanks:

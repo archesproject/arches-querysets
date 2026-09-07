@@ -145,7 +145,14 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
         self._sealed = value
 
     def save(
-        self, *, request=None, index=True, partial=None, force_admin=False, **kwargs
+        self,
+        *,
+        request=None,
+        index=True,
+        partial=None,
+        force_admin=False,
+        provisional_edits_for_user=None,
+        **kwargs,
     ):
         """
         If `partial` is not explicitly provided, infer it from the HTTP method:
@@ -181,6 +188,7 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
             index=index,
             partial=partial,
             force_admin=force_admin,
+            provisional_edits_for_user=provisional_edits_for_user,
             **kwargs,
         )
 
@@ -250,7 +258,13 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
             user=user, edit_type=edit_type, transaction_id=transaction_id
         )
 
-    def refresh_from_db(self, using=None, fields=None, from_queryset=None):
+    def refresh_from_db(
+        self,
+        using=None,
+        fields=None,
+        from_queryset=None,
+        provisional_edits_for_user=None,
+    ):
         if from_queryset is None:
             # TODO: symptom that we need a backreference to the queryset args.
             # Reuse the already-loaded GraphWithPrefetching instance (set by
@@ -279,11 +293,19 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
                 as_representation=getattr(self, "_as_representation", False),
                 nodes=nodes or None,
                 graph_query=graph_query,
+                provisional_edits_for_user=provisional_edits_for_user,
             )
         self._refresh_aliased_data(using, fields, from_queryset)
 
     def _save_aliased_data(
-        self, *, request=None, index=True, partial=True, force_admin=False, **kwargs
+        self,
+        *,
+        request=None,
+        index=True,
+        partial=True,
+        force_admin=False,
+        provisional_edits_for_user=None,
+        **kwargs,
     ):
         """Raises a compound ValidationError with any failing tile values."""
         request = ensure_request(request, force_admin)
@@ -348,17 +370,26 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
                 operation=operation,
                 changed_tile_pks=changed_tile_pks,
                 deleted_tile_pks=deleted_tile_pks,
+                provisional_edits_for_user=provisional_edits_for_user,
             )
         else:
             self.refresh_from_db(
-                using=kwargs.get("using"), fields=kwargs.get("update_fields")
+                using=kwargs.get("using"),
+                fields=kwargs.get("update_fields"),
+                provisional_edits_for_user=provisional_edits_for_user,
             )
 
         if request.GET.get("fill_blanks", "f").lower().startswith("t"):
             self.fill_blanks()
 
     def _targeted_refresh_aliased_data(
-        self, *, pre_save_tile_trees, operation, changed_tile_pks, deleted_tile_pks
+        self,
+        *,
+        pre_save_tile_trees,
+        operation,
+        changed_tile_pks,
+        deleted_tile_pks,
+        provisional_edits_for_user=None,
     ):
         """Efficiently refresh aliased_data after a save.
 
@@ -491,6 +522,7 @@ class ResourceTileTree(ResourceInstance, AliasedDataMixin):
                 tiles_to_reprocess,
                 as_representation=getattr(self, "_as_representation", False),
                 grouping_node_lookup=grouping_node_lookup,
+                provisional_edits_for_user=provisional_edits_for_user,
             )
 
         # Step 5: Rebuild the resource's top-level aliased_data from the updated tree.

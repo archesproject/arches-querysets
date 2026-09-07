@@ -6,6 +6,8 @@ Covers:
   - TileTreeQuerySet.get_tiles(provisional_edits_for_user=...)
   - ResourceTileTreeQuerySet.get_tiles(provisional_edits_for_user=...)
   - reprocess_tiles_aliased_data(provisional_edits_for_user=...)
+  - ResourceTileTree.refresh_from_db(provisional_edits_for_user=...)
+  - ResourceTileTree.save(provisional_edits_for_user=...) via targeted refresh
 """
 
 from unittest.mock import MagicMock, patch
@@ -463,3 +465,120 @@ class ReprocessTilesProvisionalEditsTests(GraphTestCase):
             provisional_edits_for_user=unrelated_user,
         )
         self.assertEqual(tiles[0].aliased_data.number_alias, self.AUTHORITATIVE_NUMBER)
+
+
+# ---------------------------------------------------------------------------
+# Integration tests — refresh_from_db() and save(provisional_edits_for_user=)
+# ---------------------------------------------------------------------------
+
+
+class SaveWithProvisionalEditsTests(GraphTestCase):
+    """provisional_edits_for_user threads through save() and refresh_from_db()
+    so that the in-memory aliased_data reflects provisional values after a save
+    or explicit refresh, without requiring a separate get_tiles() call.
+
+    Covers:
+      - refresh_from_db(provisional_edits_for_user=...) overlays provisional data
+      - refresh_from_db() without the param shows authoritative data
+      - save(provisional_edits_for_user=...) preserves the overlay via
+        _targeted_refresh_aliased_data on reprocessed tiles
+      - save() without the param reverts reprocessed tiles to authoritative data
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        call_command("add_test_users", verbosity=0)
+
+    AUTHORITATIVE_NUMBER = 42
+    PROVISIONAL_NUMBER = 99
+
+    def setUp(self):
+        self.provisional_editor = User.objects.get(username="tester3")
+
+        tile = TileModel.objects.get(pk=self.cardinality_1_tile.pk)
+        provisional_edits = _make_provisional_edits(
+            user_id=self.provisional_editor.pk,
+            tile_data=tile.data,
+            provisional_number=self.PROVISIONAL_NUMBER,
+            number_node_pk=self.number_node_1.pk,
+        )
+        TileModel.objects.filter(pk=tile.pk).update(provisionaledits=provisional_edits)
+
+    def _load_resource(self, provisional_edits_for_user=None):
+        return ResourceTileTree.get_tiles(
+            "datatype_lookups",
+            as_representation=False,
+            provisional_edits_for_user=provisional_edits_for_user,
+        ).get(pk=self.resource_42.pk)
+
+    def _number_value(self, resource):
+        return resource.aliased_data.datatypes_1.aliased_data.number_alias
+
+    # ------------------------------------------------------------------
+    # refresh_from_db
+    # ------------------------------------------------------------------
+
+    def test_refresh_from_db_overlays_provisional_edits(self):
+        """refresh_from_db(provisional_edits_for_user=...) applies the overlay."""
+        resource = self._load_resource()
+        self.assertEqual(self._number_value(resource), self.AUTHORITATIVE_NUMBER)
+
+        resource.refresh_from_db(provisional_edits_for_user=self.provisional_editor)
+
+        self.assertEqual(self._number_value(resource), self.PROVISIONAL_NUMBER)
+
+    def test_refresh_from_db_default_shows_authoritative(self):
+        """refresh_from_db() without the param returns authoritative data."""
+        resource = self._load_resource(
+            provisional_edits_for_user=self.provisional_editor
+        )
+        self.assertEqual(self._number_value(resource), self.PROVISIONAL_NUMBER)
+
+        resource.refresh_from_db()
+
+        self.assertEqual(self._number_value(resource), self.AUTHORITATIVE_NUMBER)
+
+    # ------------------------------------------------------------------
+    # save() — targeted refresh path
+    # ------------------------------------------------------------------
+
+    def test_targeted_refresh_applies_provisional_overlay_on_reprocessed_tile(self):
+        """save(provisional_edits_for_user=...) overlays provisional data on
+        tiles reprocessed by _targeted_refresh_aliased_data."""
+        resource = self._load_resource(
+            provisional_edits_for_user=self.provisional_editor
+        )
+        self.assertEqual(
+            self._number_value(resource),
+            self.PROVISIONAL_NUMBER,
+            "Precondition: provisional overlay active before save",
+        )
+
+        # Mutate the same tile to put it in to_update and trigger reprocessing.
+        # Save as admin so that provisional_edits dict in the DB is untouched.
+        tile = resource.aliased_data.datatypes_1
+        tile.aliased_data.non_localized_string_alias = "post-save-string"
+        resource.save(
+            force_admin=True,
+            provisional_edits_for_user=self.provisional_editor,
+        )
+
+        # Targeted refresh reprocesses the tile; provisional overlay must be applied.
+        self.assertEqual(self._number_value(resource), self.PROVISIONAL_NUMBER)
+
+    def test_targeted_refresh_without_param_shows_authoritative_on_reprocessed_tile(
+        self,
+    ):
+        """save() without provisional_edits_for_user shows authoritative data on
+        reprocessed tiles, regardless of whether provisional edits exist."""
+        # Fetch WITHOUT provisional overlay so aliased_data holds authoritative values.
+        resource = self._load_resource()
+        self.assertEqual(self._number_value(resource), self.AUTHORITATIVE_NUMBER)
+
+        tile = resource.aliased_data.datatypes_1
+        tile.aliased_data.non_localized_string_alias = "post-save-no-prov"
+        resource.save(force_admin=True)  # no provisional_edits_for_user
+
+        # Targeted refresh runs without the overlay; authoritative data is shown.
+        self.assertEqual(self._number_value(resource), self.AUTHORITATIVE_NUMBER)

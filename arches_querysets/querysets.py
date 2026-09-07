@@ -127,6 +127,7 @@ def reprocess_tiles_aliased_data(
                 setattr(tile.aliased_data, child_nodegroup_alias, existing)
             child_tile.parent = tile
             child_tile._as_representation = as_representation
+            child_tile._provisional_edits_for_user = provisional_edits_for_user
 
         # Set default empty values for child nodegroups that have no tiles.
         child_nodegroups = (
