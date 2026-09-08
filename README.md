@@ -180,6 +180,15 @@ In [3]: result.aliased_data.datatypes_1.aliased_data.string_alias = 'new value'
 In [4]: result.save(force_admin=True)
 ```
 
+Pass `provisional_edits_for_user` to overlay a user's pending edits onto `aliased_data` without affecting the authoritative record:
+
+```py
+In [5]: result = ResourceTileTree.get_tiles(
+    ...:     graph_slug="datatype_lookups",
+    ...:     provisional_edits_for_user=request.user,
+    ...: ).get(pk=result.pk)
+```
+
 ### How would this help an Arches developer?
 
 If you wish to stand up an API to power a frontend, rediscovering patterns for routes, views, filtering, validation, pagination, and error handling in every project can increase maintenance burdens and prevent developers with relatively less Arches experience from making productive contributions. Given the numerous translations necessary among resources, nodes, and tiles, expressing queries in a readable way using the Django ORM can be quite difficult--making it tempting to drop to raw SQL, which comes with its own security, reusability, and caching drawbacks. Finally, having to reference node values by UUIDs is a developer experience negative.
@@ -229,6 +238,7 @@ Factors differentiating the arches-querysets approach include:
         - migrations
         - registering custom SQL lookups
 - Reduce drift against core Arches development: validation traffic still routed through core arches python methods
+- Provisional edit support: overlay pending edits onto `aliased_data` for the edit author or a Resource Reviewer via `provisional_edits_for_user`, without affecting the authoritative record
 - Fully dynamic:
     - does not require declaring "well-known" models
     - does not require database migrations
