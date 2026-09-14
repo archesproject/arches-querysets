@@ -46,7 +46,9 @@ def _resolve_provisional_data(tile, provisional_edits_for_user):
         return provisional[user_id_str]["value"]
 
     if user_is_resource_reviewer(provisional_edits_for_user):
-        first_editor_id = next(iter(provisional))
+        first_editor_id = min(
+            provisional, key=lambda uid: provisional[uid]["timestamp"]
+        )
         return provisional[first_editor_id]["value"]
 
     return None
