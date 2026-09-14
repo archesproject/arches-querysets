@@ -133,7 +133,9 @@ class ResolveProvisionalDataTests(GraphTestCase):
 
     def test_reviewer_sees_another_editors_value(self):
         expected = {"node-pk": "editors-value"}
-        tile = self._tile({"99": {"value": expected, "status": "review"}})
+        tile = self._tile(
+            {"99": self._provisional_edit(expected, "2026-01-01T00:00:00.000000Z")}
+        )
         reviewer = self._user(1)  # pk not in provisionaledits
         with patch(
             "arches_querysets.querysets.user_is_resource_reviewer", return_value=True
@@ -165,7 +167,9 @@ class ResolveProvisionalDataTests(GraphTestCase):
     def test_real_reviewer_sees_edit_from_another_user(self):
         reviewer = User.objects.get(username="dev")
         expected = {"node": "value"}
-        tile = self._tile({"9999": {"value": expected, "status": "review"}})
+        tile = self._tile(
+            {"9999": self._provisional_edit(expected, "2026-01-01T00:00:00.000000Z")}
+        )
         result = _resolve_provisional_data(tile, reviewer)
         self.assertEqual(result, expected)
 
@@ -174,6 +178,63 @@ class ResolveProvisionalDataTests(GraphTestCase):
         tile = self._tile({"9999": {"value": {"node": "v"}, "status": "review"}})
         result = _resolve_provisional_data(tile, non_reviewer)
         self.assertIsNone(result)
+
+    # ------------------------------------------------------------------
+    # Timestamp ordering — reviewer sees the oldest (first) edit
+    # ------------------------------------------------------------------
+
+    def _provisional_edit(self, value, timestamp):
+        return {
+            "value": value,
+            "action": "update",
+            "status": "review",
+            "reviewer": None,
+            "timestamp": timestamp,
+            "reviewtimestamp": None,
+        }
+
+    def test_reviewer_sees_oldest_edit_with_multiple_editors(self):
+        """Reviewer should see the edit with the earliest timestamp."""
+        oldest_value = {"node": "oldest"}
+        newer_value = {"node": "newer"}
+        tile = self._tile(
+            {
+                "10": self._provisional_edit(
+                    oldest_value, "2026-01-01T00:00:00.000000Z"
+                ),
+                "20": self._provisional_edit(
+                    newer_value, "2026-06-01T00:00:00.000000Z"
+                ),
+            }
+        )
+        reviewer = self._user(1)
+        with patch(
+            "arches_querysets.querysets.user_is_resource_reviewer", return_value=True
+        ):
+            result = _resolve_provisional_data(tile, reviewer)
+        self.assertEqual(result, oldest_value)
+
+    def test_reviewer_sees_oldest_regardless_of_dict_insertion_order(self):
+        """Dict insertion order must not determine which edit a reviewer sees."""
+        older_value = {"node": "older"}
+        newest_value = {"node": "newest"}
+        # Newer entry inserted first — should still return the older one.
+        tile = self._tile(
+            {
+                "20": self._provisional_edit(
+                    newest_value, "2026-09-01T00:00:00.000000Z"
+                ),
+                "10": self._provisional_edit(
+                    older_value, "2026-01-01T00:00:00.000000Z"
+                ),
+            }
+        )
+        reviewer = self._user(1)
+        with patch(
+            "arches_querysets.querysets.user_is_resource_reviewer", return_value=True
+        ):
+            result = _resolve_provisional_data(tile, reviewer)
+        self.assertEqual(result, older_value)
 
 
 # ---------------------------------------------------------------------------
