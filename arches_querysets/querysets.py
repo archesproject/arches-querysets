@@ -24,7 +24,7 @@ from arches_querysets.utils.models import (
 NOT_PROVIDED = object()
 
 
-def _resolve_provisional_data(tile, provisional_edits_for_user):
+def _resolve_provisional_data(tile, provisional_edits_for_user, is_reviewer):
     """Return the provisional value dict to overlay for this tile, or None.
 
     Called once per tile during aliased_data construction.  Returns the
@@ -45,7 +45,7 @@ def _resolve_provisional_data(tile, provisional_edits_for_user):
     if user_id_str in provisional:
         return provisional[user_id_str]["value"]
 
-    if user_is_resource_reviewer(provisional_edits_for_user):
+    if is_reviewer:
         first_editor_id = min(
             provisional, key=lambda uid: provisional[uid]["timestamp"]
         )
@@ -77,12 +77,19 @@ def reprocess_tiles_aliased_data(
     values_by_datatype = defaultdict(list)
     aliased_data_to_update = {}
     data_overrides = {}
+    is_reviewer = (
+        user_is_resource_reviewer(provisional_edits_for_user)
+        if provisional_edits_for_user
+        else False
+    )
 
     for tile in tiles:
         tile.aliased_data = AliasedData()
         tile._as_representation = as_representation
 
-        provisional_data = _resolve_provisional_data(tile, provisional_edits_for_user)
+        provisional_data = _resolve_provisional_data(
+            tile, provisional_edits_for_user, is_reviewer
+        )
         if provisional_data is not None:
             data_overrides[tile.pk] = tile.data
             tile.data = provisional_data
@@ -379,6 +386,11 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
         values_by_datatype = defaultdict(list)
         datatype_contexts = {}
         data_overrides = {}
+        is_reviewer = (
+            user_is_resource_reviewer(provisional_edits_for_user)
+            if provisional_edits_for_user
+            else False
+        )
 
         for tile in self._result_cache:
             if tile.aliased_data is None:
@@ -388,7 +400,7 @@ class TileTreeQuerySet(NodeAliasValuesMixin, models.QuerySet):
             tile.sync_private_attributes(self)
 
             provisional_data = _resolve_provisional_data(
-                tile, provisional_edits_for_user
+                tile, provisional_edits_for_user, is_reviewer
             )
             if provisional_data is not None:
                 data_overrides[tile.pk] = tile.data

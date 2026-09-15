@@ -10,12 +10,13 @@ Covers:
   - ResourceTileTree.save(provisional_edits_for_user=...) via targeted refresh
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from django.contrib.auth.models import User
 from django.core.management import call_command
 
 from arches.app.models.models import TileModel
+from arches.app.utils.permission_backend import user_is_resource_reviewer
 
 from arches_querysets.models import ResourceTileTree, TileTree
 from arches_querysets.querysets import (
@@ -85,15 +86,15 @@ class ResolveProvisionalDataTests(GraphTestCase):
 
     def test_returns_none_when_user_is_none(self):
         tile = self._tile({"1": {"value": {"n": "v"}, "status": "review"}})
-        self.assertIsNone(_resolve_provisional_data(tile, None))
+        self.assertIsNone(_resolve_provisional_data(tile, None, False))
 
     def test_returns_none_when_provisionaledits_is_none(self):
         tile = self._tile(provisionaledits=None)
-        self.assertIsNone(_resolve_provisional_data(tile, self._user(1)))
+        self.assertIsNone(_resolve_provisional_data(tile, self._user(1), False))
 
     def test_returns_none_when_provisionaledits_is_empty(self):
         tile = self._tile(provisionaledits={})
-        self.assertIsNone(_resolve_provisional_data(tile, self._user(1)))
+        self.assertIsNone(_resolve_provisional_data(tile, self._user(1), False))
 
     # ------------------------------------------------------------------
     # Edit author path
@@ -102,17 +103,16 @@ class ResolveProvisionalDataTests(GraphTestCase):
     def test_returns_own_provisional_value(self):
         expected = {"node-pk": "my-value"}
         tile = self._tile({"99": {"value": expected, "status": "review"}})
-        result = _resolve_provisional_data(tile, self._user(99))
+        result = _resolve_provisional_data(tile, self._user(99), False)
         self.assertEqual(result, expected)
 
-    def test_own_edit_returned_without_checking_reviewer_status(self):
-        """user_id match short-circuits before the reviewer permission check."""
-        tile = self._tile({"5": {"value": {"n": "v"}, "status": "review"}})
-        with patch(
-            "arches_querysets.querysets.user_is_resource_reviewer"
-        ) as mock_reviewer:
-            _resolve_provisional_data(tile, self._user(5))
-        mock_reviewer.assert_not_called()
+    def test_own_edit_returned_regardless_of_reviewer_flag(self):
+        """user_id match short-circuits before the is_reviewer check."""
+        expected = {"n": "v"}
+        tile = self._tile({"5": {"value": expected, "status": "review"}})
+        # Even with is_reviewer=True the user's own edit is returned directly.
+        result = _resolve_provisional_data(tile, self._user(5), True)
+        self.assertEqual(result, expected)
 
     # ------------------------------------------------------------------
     # Non-reviewer without own edit
@@ -121,10 +121,7 @@ class ResolveProvisionalDataTests(GraphTestCase):
     def test_returns_none_for_non_reviewer_without_own_edit(self):
         tile = self._tile({"99": {"value": {"n": "v"}, "status": "review"}})
         user = self._user(42)  # not in provisionaledits
-        with patch(
-            "arches_querysets.querysets.user_is_resource_reviewer", return_value=False
-        ):
-            result = _resolve_provisional_data(tile, user)
+        result = _resolve_provisional_data(tile, user, is_reviewer=False)
         self.assertIsNone(result)
 
     # ------------------------------------------------------------------
@@ -137,18 +134,12 @@ class ResolveProvisionalDataTests(GraphTestCase):
             {"99": self._provisional_edit(expected, "2026-01-01T00:00:00.000000Z")}
         )
         reviewer = self._user(1)  # pk not in provisionaledits
-        with patch(
-            "arches_querysets.querysets.user_is_resource_reviewer", return_value=True
-        ):
-            result = _resolve_provisional_data(tile, reviewer)
+        result = _resolve_provisional_data(tile, reviewer, is_reviewer=True)
         self.assertEqual(result, expected)
 
     def test_reviewer_with_no_provisional_edits_returns_none(self):
         tile = self._tile(provisionaledits=None)
-        with patch(
-            "arches_querysets.querysets.user_is_resource_reviewer", return_value=True
-        ):
-            result = _resolve_provisional_data(tile, self._user(1))
+        result = _resolve_provisional_data(tile, self._user(1), is_reviewer=True)
         self.assertIsNone(result)
 
     # ------------------------------------------------------------------
@@ -161,7 +152,9 @@ class ResolveProvisionalDataTests(GraphTestCase):
         tile = self._tile(
             {str(provisional_editor.pk): {"value": expected, "status": "review"}}
         )
-        result = _resolve_provisional_data(tile, provisional_editor)
+        result = _resolve_provisional_data(
+            tile, provisional_editor, user_is_resource_reviewer(provisional_editor)
+        )
         self.assertEqual(result, expected)
 
     def test_real_reviewer_sees_edit_from_another_user(self):
@@ -170,13 +163,17 @@ class ResolveProvisionalDataTests(GraphTestCase):
         tile = self._tile(
             {"9999": self._provisional_edit(expected, "2026-01-01T00:00:00.000000Z")}
         )
-        result = _resolve_provisional_data(tile, reviewer)
+        result = _resolve_provisional_data(
+            tile, reviewer, user_is_resource_reviewer(reviewer)
+        )
         self.assertEqual(result, expected)
 
     def test_real_non_reviewer_cannot_see_others_edit(self):
         non_reviewer = User.objects.get(username="tester1")
         tile = self._tile({"9999": {"value": {"node": "v"}, "status": "review"}})
-        result = _resolve_provisional_data(tile, non_reviewer)
+        result = _resolve_provisional_data(
+            tile, non_reviewer, user_is_resource_reviewer(non_reviewer)
+        )
         self.assertIsNone(result)
 
     # ------------------------------------------------------------------
@@ -207,11 +204,7 @@ class ResolveProvisionalDataTests(GraphTestCase):
                 ),
             }
         )
-        reviewer = self._user(1)
-        with patch(
-            "arches_querysets.querysets.user_is_resource_reviewer", return_value=True
-        ):
-            result = _resolve_provisional_data(tile, reviewer)
+        result = _resolve_provisional_data(tile, self._user(1), is_reviewer=True)
         self.assertEqual(result, oldest_value)
 
     def test_reviewer_sees_oldest_regardless_of_dict_insertion_order(self):
@@ -229,11 +222,7 @@ class ResolveProvisionalDataTests(GraphTestCase):
                 ),
             }
         )
-        reviewer = self._user(1)
-        with patch(
-            "arches_querysets.querysets.user_is_resource_reviewer", return_value=True
-        ):
-            result = _resolve_provisional_data(tile, reviewer)
+        result = _resolve_provisional_data(tile, self._user(1), is_reviewer=True)
         self.assertEqual(result, older_value)
 
 
