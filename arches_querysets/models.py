@@ -581,7 +581,6 @@ class TileTree(TileModel, AliasedDataMixin):
     def __init__(self, *args, **kwargs):
         self._as_representation = kwargs.pop("__as_representation", False)
         self._request = kwargs.pop("__request", None)
-        self._provisional_edits_for_user = None
         arches_model_kwargs, other_kwargs = pop_arches_model_kwargs(
             kwargs, self._meta.get_fields()
         )
@@ -773,14 +772,8 @@ class TileTree(TileModel, AliasedDataMixin):
     def sync_private_attributes(self, source):
         if isinstance(source, models.QuerySet):
             self._as_representation = source._hints.get("as_representation", False)
-            self._provisional_edits_for_user = source._hints.get(
-                "provisional_edits_for_user", None
-            )
         else:
             self._as_representation = source._as_representation
-            self._provisional_edits_for_user = getattr(
-                source, "_provisional_edits_for_user", None
-            )
 
     def append_tile(self, nodegroup_alias):
         grouping_node_aliases = {
